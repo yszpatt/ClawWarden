@@ -1,6 +1,6 @@
 import { createServer } from './server';
 
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 4001;
 
 async function main() {
     const server = await createServer();

@@ -2,19 +2,37 @@ import type { ReactNode } from 'react';
 
 interface HeaderProps {
     projectName?: string;
-    onProjectChange?: () => void;
+    onBackToProjects?: () => void;
     onSettingsClick?: () => void;
 }
 
-export function Header({ projectName, onSettingsClick }: HeaderProps) {
+export function Header({ projectName, onBackToProjects, onSettingsClick }: HeaderProps) {
     return (
         <header className="app-header">
-            <h1>AntiWarden</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {onBackToProjects && (
+                    <button
+                        className="settings-btn"
+                        onClick={onBackToProjects}
+                        title="返回项目列表"
+                    >
+                        ←
+                    </button>
+                )}
+                <h1>AntiWarden</h1>
+            </div>
             <div className="header-actions">
-                <select className="project-selector" defaultValue="">
-                    <option value="" disabled>选择项目...</option>
-                    {projectName && <option value="current">{projectName}</option>}
-                </select>
+                {projectName && (
+                    <span style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.875rem',
+                        padding: '0.5rem 1rem',
+                        background: 'var(--bg-tertiary)',
+                        borderRadius: '6px',
+                    }}>
+                        📁 {projectName}
+                    </span>
+                )}
                 <button className="settings-btn" onClick={onSettingsClick}>
                     ⚙️
                 </button>
@@ -49,6 +67,7 @@ interface LayoutProps {
     sidebarOpen?: boolean;
     sidebarTitle?: string;
     onSidebarClose?: () => void;
+    onBackToProjects?: () => void;
     projectName?: string;
 }
 
@@ -58,11 +77,12 @@ export function Layout({
     sidebarOpen,
     sidebarTitle,
     onSidebarClose,
+    onBackToProjects,
     projectName,
 }: LayoutProps) {
     return (
         <div className="app-layout">
-            <Header projectName={projectName} />
+            <Header projectName={projectName} onBackToProjects={onBackToProjects} />
             <div className="app-content">
                 <main className="main-content">{children}</main>
                 {sidebarOpen && sidebarContent && (
