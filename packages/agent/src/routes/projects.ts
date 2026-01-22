@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { v4 as uuid } from 'uuid';
 import { readGlobalConfig, writeGlobalConfig, initializeProject, readProjectData } from '../utils/json-store';
+import { installSkills } from '../services/skills-installer';
 import type { ProjectRef } from '@antiwarden/shared';
 
 export async function projectRoutes(fastify: FastifyInstance) {
@@ -24,6 +25,13 @@ export async function projectRoutes(fastify: FastifyInstance) {
         };
 
         await initializeProject(path, project.id);
+
+        // Auto-install AntiWarden skills to the project
+        const installedSkills = await installSkills(path);
+        if (installedSkills.length > 0) {
+            fastify.log.info(`Installed skills: ${installedSkills.join(', ')}`);
+        }
+
         config.projects.push(project);
         await writeGlobalConfig(config);
 
