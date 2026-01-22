@@ -10,16 +10,17 @@
     },
     "dependencies": {
         "@antiwarden/shared": "workspace:*",
-        "fastify": "^4.25.0",
         "@fastify/cors": "^8.4.0",
         "@fastify/websocket": "^8.3.0",
         "chokidar": "^3.5.3",
+        "fastify": "^4.25.0",
         "node-pty": "^1.0.0",
         "uuid": "^9.0.0"
     },
     "devDependencies": {
         "@types/node": "^20.10.0",
         "@types/uuid": "^9.0.0",
+        "@types/ws": "^8.18.1",
         "tsx": "^4.7.0"
     }
 }
