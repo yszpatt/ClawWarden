@@ -3,6 +3,7 @@ export interface Lane {
     name: string;
     order: number;
     color: string;
+    systemPrompt?: string;
 }
 
 export const DEFAULT_LANES: Lane[] = [
