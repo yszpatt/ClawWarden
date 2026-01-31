@@ -478,19 +478,10 @@ export function useTerminalConnection(
         });
     };
 
-    const startDesign = () => {
-        manager.send({
-            type: 'design-start',
-            projectId,
-            taskId,
-        });
-    };
-
     return {
         connect,
         execute,
         attach,
-        startDesign,
         sendInput,
         handleResize,
         stop,

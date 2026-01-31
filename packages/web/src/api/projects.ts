@@ -84,23 +84,6 @@ export async function deleteTask(projectId: string, taskId: string): Promise<voi
     return res.json();
 }
 
-// Design API functions
-export async function generateDesign(
-    projectId: string,
-    taskId: string
-): Promise<{ success: boolean; designPath: string; content: string }> {
-    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}/design`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-    });
-    if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: 'Failed to generate design' }));
-        throw new Error(error.message);
-    }
-    return res.json();
-}
-
 export async function fetchDesign(
     projectId: string,
     taskId: string

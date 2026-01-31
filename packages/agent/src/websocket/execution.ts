@@ -10,6 +10,7 @@ import { worktreeManager } from '../services/worktree-manager';
 import { conversationStorage } from '../services/conversation-storage.js';
 import { getSchemaForLane, getOutputTypeForLane } from '../services/schemas';
 import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task } from '@antiwarden/shared';
+import { getLanePrompt } from '@antiwarden/shared';
 
 /**
  * Helper function to update task status across all projects
@@ -75,12 +76,6 @@ interface AttachMessage {
     projectId: string;
 }
 
-interface DesignStartMessage {
-    type: 'design-start';
-    taskId: string;
-    projectId: string;
-}
-
 interface ConversationUserInputMessage {
     type: 'conversation.user_input';
     taskId: string;
@@ -93,7 +88,7 @@ interface ConversationDesignStartMessage {
     projectId: string;
 }
 
-type ClientMessage = ExecuteMessage | InputMessage | StopMessage | ResizeMessage | AttachMessage | DesignStartMessage | ConversationUserInputMessage | ConversationDesignStartMessage;
+type ClientMessage = ExecuteMessage | InputMessage | StopMessage | ResizeMessage | AttachMessage | ConversationUserInputMessage | ConversationDesignStartMessage;
 
 export async function executionHandler(fastify: FastifyInstance) {
     fastify.get('/ws/execute', { websocket: true }, (connection, _request) => {
@@ -245,10 +240,6 @@ export async function executionHandler(fastify: FastifyInstance) {
                         currentTaskId = message.taskId;
                         await handleAttach(connection, message);
                         break;
-                    case 'design-start':
-                        currentTaskId = message.taskId;
-                        await handleDesignStart(connection, message);
-                        break;
                     case 'input':
                         if (currentTaskId) {
                             handleInput(currentTaskId, message.data);
@@ -380,18 +371,6 @@ function handleStop(taskId: string) {
     agentManager.stopTask(taskId);
 }
 
-// Helper function to get lane prompt
-function getLanePrompt(laneId: string, projectData: ProjectData, globalLanePrompts: Record<string, string>): string {
-    const lane = projectData.lanes.find((l: Lane) => l.id === laneId);
-    if (lane?.systemPrompt) {
-        return lane.systemPrompt;
-    }
-    if (globalLanePrompts[laneId]) {
-        return globalLanePrompts[laneId];
-    }
-    return '';
-}
-
 // Helper to find task across all projects
 async function findTask(taskId: string): Promise<{ project: any, data: ProjectData, task: any } | null> {
     const config = await readGlobalConfig();
@@ -403,219 +382,6 @@ async function findTask(taskId: string): Promise<{ project: any, data: ProjectDa
         }
     }
     return null;
-}
-
-async function handleDesignStart(connection: SocketStream, message: DesignStartMessage) {
-    try {
-        const result = await findTask(message.taskId);
-        if (!result) {
-            connection.socket.send(JSON.stringify({
-                type: 'error',
-                message: 'Task not found'
-            }));
-            return;
-        }
-
-        const { project, data, task } = result;
-
-        // Update task status to running
-        task.status = 'running';
-        task.updatedAt = new Date().toISOString();
-        await writeProjectData(project.path, data);
-
-        // Send initial status message
-        connection.socket.send(JSON.stringify({
-            type: 'output',
-            taskId: task.id,
-            data: `\x1b[33m[Design] Starting design generation for task: ${task.id}\x1b[0m\r\n`
-        }));
-
-        // Run design generation in background to stream output
-        (async () => {
-            let designContent = '';
-            let hasError = false;
-
-            try {
-                // Step 1: Create worktree if not exists
-                if (!task.worktree) {
-                    connection.socket.send(JSON.stringify({
-                        type: 'output',
-                        taskId: task.id,
-                        data: `[Design] Creating worktree...\r\n`
-                    }));
-                    const worktree = await worktreeManager.createWorktree(project.path, task.id);
-                    if (worktree) {
-                        task.worktree = worktree;
-                    } else {
-                        connection.socket.send(JSON.stringify({
-                            type: 'output',
-                            taskId: task.id,
-                            data: `[Design] Not a git repo, using project path directly\r\n`
-                        }));
-                    }
-                }
-
-                // Step 2: Create Claude session if not exists
-                // Note: We'll use the SDK's session ID, not generate our own
-                // The SDK session ID will be captured and emitted via sessionStart event
-                if (!task.claudeSession) {
-                    // Create a placeholder - will be updated with SDK's session ID
-                    task.claudeSession = {
-                        id: '',  // Will be filled by SDK
-                        createdAt: new Date().toISOString(),
-                    };
-                }
-                // Don't send 'started' message yet - wait for SDK to provide session ID
-                // The sessionStartListener in executionHandler will handle this
-
-                // Step 3: Determine working directory
-                const workingDir = task.worktree?.path || project.path;
-
-                // Ensure designs directory exists
-                const designsDir = path.join(workingDir, '.antiwarden', 'designs');
-                await fs.mkdir(designsDir, { recursive: true });
-
-                const designFileName = `${task.id}-design.md`;
-                const designPath = path.join(designsDir, designFileName);
-
-                // Build prompts
-                const userPrompt = `## 需求信息
-
-**标题**: ${task.title}
-
-**描述**:
-${task.description}
-
-${task.prompt ? `**补充说明**:
-${task.prompt}` : ''}
-
----
-
-请根据以上需求生成技术设计方案文档。`;
-
-                const config = await readGlobalConfig();
-                const systemPrompt = getLanePrompt('design', data, config.settings.lanePrompts || {});
-                const outputFormat = getSchemaForLane('design');
-
-                connection.socket.send(JSON.stringify({
-                    type: 'output',
-                    taskId: task.id,
-                    data: `[Design] Starting Claude execution...\r\n`
-                }));
-
-                // Use AgentManager for design generation with streaming
-                designContent = await agentManager.generateDesign(
-                    task.id,
-                    workingDir,
-                    userPrompt,
-                    systemPrompt,
-                    {
-                        onLog: (msg) => {
-                            connection.socket.send(JSON.stringify({
-                                type: 'output',
-                                taskId: task.id,
-                                data: `\x1b[90m${msg}\x1b[0m\r\n`
-                            }));
-                        },
-                        onOutput: (chunk) => {
-                            // For design generation, don't stream markdown to terminal
-                            // Instead show progress indicator
-                            // The markdown will be displayed in the design preview panel
-                        },
-                        onError: (err) => {
-                            connection.socket.send(JSON.stringify({
-                                type: 'error',
-                                message: err.message
-                            }));
-                        },
-                        onSessionStart: async (sessionId) => {
-                            console.log(`[Design] SDK session started: ${sessionId}`);
-                            // Update task with SDK's session ID
-                            if (task.claudeSession?.id !== sessionId) {
-                                task.claudeSession = {
-                                    id: sessionId,
-                                    createdAt: new Date().toISOString(),
-                                };
-                                await writeProjectData(project.path, data);
-                                console.log(`[Design] Updated task with SDK session ID: ${sessionId}`);
-                            }
-                            // Send 'started' message to frontend
-                            connection.socket.send(JSON.stringify({
-                                type: 'started',
-                                taskId: task.id,
-                                sessionId: sessionId
-                            }));
-                        },
-                        onStructuredOutput: async (output) => {
-                            console.log(`[Design] Structured output received:`, output);
-                            // Send to frontend
-                            connection.socket.send(JSON.stringify({
-                                type: 'structured-output',
-                                taskId: task.id,
-                                output: output
-                            }));
-                            // Save to task
-                            const structuredOutput: StructuredOutput = {
-                                type: 'design',
-                                schemaVersion: '1.0',
-                                data: output,
-                                timestamp: new Date().toISOString()
-                            };
-                            task.structuredOutput = structuredOutput;
-                            await writeProjectData(project.path, data);
-                        }
-                    },
-                    outputFormat
-                );
-
-                // Save design to file
-                await fs.writeFile(designPath, designContent, 'utf-8');
-
-                connection.socket.send(JSON.stringify({
-                    type: 'output',
-                    taskId: task.id,
-                    data: `\x1b[32m[Design] Design saved to: ${designPath}\x1b[0m\r\n`
-                }));
-
-                // Update task status
-                task.status = 'pending-dev';
-                task.designPath = path.relative(workingDir, designPath);
-                task.updatedAt = new Date().toISOString();
-                await writeProjectData(project.path, data);
-
-                // Send completion message
-                connection.socket.send(JSON.stringify({
-                    type: 'design-complete',
-                    taskId: task.id,
-                    designPath: task.designPath,
-                    content: designContent
-                }));
-
-            } catch (error: any) {
-                hasError = true;
-                console.error('[Design Error]', error);
-                connection.socket.send(JSON.stringify({
-                    type: 'error',
-                    message: `Design generation failed: ${error.message}`
-                }));
-
-                // Update task status to failed
-                const updated = await findTask(task.id);
-                if (updated) {
-                    updated.task.status = 'failed';
-                    updated.task.updatedAt = new Date().toISOString();
-                    await writeProjectData(updated.project.path, updated.data);
-                }
-            }
-        })();
-
-    } catch (error: any) {
-        console.error('[Design Start Error]', error);
-        connection.socket.send(JSON.stringify({
-            type: 'error',
-            message: error.message
-        }));
-    }
 }
 
 /**
@@ -884,41 +650,39 @@ async function handleConversationDesignStart(
 
     let designContent = '';
 
-    // Build design prompt
-    const userPrompt = `## 需求信息
-
-**标题**: ${task.title}
-
-**描述**:
-${task.description}
-
-${task.prompt ? `**补充说明**:\n${task.prompt}` : ''}
-
----
-
-请根据以上需求生成技术设计方案文档。请包含：
-1. 需求分析
-2. 技术选型
-3. 架构设计
-4. 实现步骤
-5. 测试计划
-
-使用 markdown 格式输出。`;
+    // Build user prompt from task data
+    // Use task.prompt as the primary user prompt, fallback to title + description
+    const userPrompt = task.prompt || `## 任务需求\n\n**标题**: ${task.title}\n\n**描述**:\n${task.description}`;
 
     const config = await readGlobalConfig();
-    const systemPrompt = getLanePrompt('design', data, config.settings.lanePrompts || {});
+    // Use lane prompt as system prompt (configured in settings)
+    const lanePrompt = getLanePrompt('design', data, config.settings.lanePrompts || {});
+
+    // Debug: log lane configuration
+    console.log('[Execution] Lane config:', {
+        laneId: 'design',
+        projectLanes: data.lanes.map((l: any) => ({ id: l.id, name: l.name, hasSystemPrompt: !!l.systemPrompt })),
+        globalLanePrompts: Object.keys(config.settings.lanePrompts || {}),
+        lanePromptLength: lanePrompt.length,
+        lanePromptPreview: lanePrompt ? lanePrompt.slice(0, 100) : '(empty)',
+    });
+
+    // Combine system prompt with user prompt (same approach as agentManager.generateDesign)
+    const prompt = lanePrompt
+        ? `${lanePrompt}\n\n---\n\n${userPrompt}`
+        : userPrompt;
 
     console.log('[Execution] Starting design generation with streaming, sessionId:', sessionId);
+    console.log('[Execution] Lane prompt length:', lanePrompt.length, 'User prompt length:', userPrompt.length, 'Final prompt length:', prompt.length);
 
     // Use query() for streaming design, maintaining session continuity
     try {
         for await (const sdkMessage of query({
-            prompt: userPrompt,
+            prompt,
             options: {
                 allowedTools: ['Read', 'Glob', 'Grep'],
                 settingSources: ['project'],
                 cwd: workingDir,
-                systemPrompt,
                 resume: sessionId,  // Resume existing session to maintain conversation context
             },
         })) {
