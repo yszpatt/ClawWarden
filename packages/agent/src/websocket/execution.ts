@@ -7,9 +7,9 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import { readGlobalConfig, readProjectData, writeProjectData } from '../utils/json-store';
 import { agentManager } from '../services/agent-manager';
 import { worktreeManager } from '../services/worktree-manager';
-import { conversationStorage } from '../services/conversation-storage.js';
+import { conversationStorage } from '../services/conversation-storage';
 import { getSchemaForLane, getOutputTypeForLane } from '../services/schemas';
-import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task } from '@antiwarden/shared';
+import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task, ToolCall } from '@antiwarden/shared';
 import { getLanePrompt } from '@antiwarden/shared';
 
 /**
@@ -88,7 +88,13 @@ interface ConversationDesignStartMessage {
     projectId: string;
 }
 
-type ClientMessage = ExecuteMessage | InputMessage | StopMessage | ResizeMessage | AttachMessage | ConversationUserInputMessage | ConversationDesignStartMessage;
+interface ConversationExecuteStartMessage {
+    type: 'conversation.execute_start';
+    taskId: string;
+    projectId: string;
+}
+
+type ClientMessage = ExecuteMessage | InputMessage | StopMessage | ResizeMessage | AttachMessage | ConversationUserInputMessage | ConversationDesignStartMessage | ConversationExecuteStartMessage;
 
 export async function executionHandler(fastify: FastifyInstance) {
     fastify.get('/ws/execute', { websocket: true }, (connection, _request) => {
@@ -258,6 +264,9 @@ export async function executionHandler(fastify: FastifyInstance) {
                         break;
                     case 'conversation.design_start':
                         await handleConversationDesignStart(connection, message);
+                        break;
+                    case 'conversation.execute_start':
+                        await handleConversationExecuteStart(connection, message);
                         break;
                 }
             } catch (err) {
@@ -529,7 +538,7 @@ async function handleConversationUserMessage(
             // Mark message as complete and save final state
             const conversation = await conversationStorage.load(taskId);
             if (conversation) {
-                const msg = conversation.messages.find(m => m.id === assistantMessageId);
+                const msg = conversation.messages.find((m: any) => m.id === assistantMessageId);
                 if (msg && msg.role === 'assistant') {
                     (msg as any).status = 'complete';
                     msg.content = accumulatedContent;
@@ -725,7 +734,7 @@ async function handleConversationDesignStart(
                     // Block completed, update conversation storage
                     const conv = await conversationStorage.load(taskId);
                     if (conv) {
-                        const msg = conv.messages.find(m => m.id === assistantMessageId);
+                        const msg = conv.messages.find((m: any) => m.id === assistantMessageId);
                         if (msg && msg.role === 'assistant') {
                             (msg as any).content = designContent;
                             (msg as any).status = 'streaming';
@@ -760,7 +769,7 @@ async function handleConversationDesignStart(
                 // Mark assistant message as complete
                 const conv = await conversationStorage.load(taskId);
                 if (conv) {
-                    const msg = conv.messages.find(m => m.id === assistantMessageId);
+                    const msg = conv.messages.find((m: any) => m.id === assistantMessageId);
                     if (msg && msg.role === 'assistant') {
                         (msg as any).content = designContent;
                         (msg as any).status = 'complete';
@@ -826,6 +835,438 @@ async function handleConversationDesignStart(
         }
     } catch (error: any) {
         console.error('[Execution] Design generation error:', error);
+
+        // Save error to conversation
+        const conv = await conversationStorage.load(taskId);
+        if (conv) {
+            const errorMessage: ConversationMessage = {
+                id: uuid(),
+                role: 'system',
+                content: `错误: ${error.message}`,
+                type: 'error',
+                timestamp: new Date().toISOString(),
+            };
+            conv.messages.push(errorMessage);
+            await conversationStorage.save(taskId, conv);
+        }
+
+        connection.socket.send(JSON.stringify({
+            type: 'conversation.error',
+            taskId,
+            error: error.message,
+        } as ConversationWsMessage));
+    }
+}
+
+/**
+ * Handle execution start through conversation panel
+ * Routes to appropriate handler based on task lane
+ */
+async function handleConversationExecuteStart(
+    connection: SocketStream,
+    message: ConversationExecuteStartMessage
+) {
+    const { taskId, projectId } = message;
+    console.log('[Execution] Execute start:', taskId);
+
+    const result = await findTask(taskId);
+    if (!result) {
+        connection.socket.send(JSON.stringify({
+            type: 'conversation.error',
+            taskId,
+            error: 'Task not found'
+        } as ConversationWsMessage));
+        return;
+    }
+
+    const { task } = result;
+    const laneId = task.laneId;
+
+    // Route to appropriate handler based on lane
+    switch (laneId) {
+        case 'design':
+            console.log('[Execution] Design lane, using handleConversationDesignStart');
+            await handleConversationDesignStart(connection, {
+                type: 'conversation.design_start',
+                taskId,
+                projectId,
+            } as ConversationDesignStartMessage);
+            break;
+        case 'develop':
+            console.log('[Execution] Routing develop lane to handleConversationDevelopStart');
+            await handleConversationDevelopStart(connection, message);
+            break;
+        case 'test':
+            console.log('[Execution] Routing test lane to handleConversationTestStart');
+            await handleConversationTestStart(connection, message);
+            break;
+        default:
+            console.log('[Execution] Unknown lane, using default execute handler');
+            await handleConversationDefaultExecute(connection, message);
+            break;
+    }
+}
+
+/**
+ * Handle develop lane execution through conversation
+ */
+async function handleConversationDevelopStart(
+    connection: SocketStream,
+    message: ConversationExecuteStartMessage
+) {
+    await handleLaneExecutionWithAgent(connection, message, 'develop');
+}
+
+/**
+ * Handle test lane execution through conversation
+ */
+async function handleConversationTestStart(
+    connection: SocketStream,
+    message: ConversationExecuteStartMessage
+) {
+    await handleLaneExecutionWithAgent(connection, message, 'test');
+}
+
+/**
+ * Handle default execution (for lanes without specific handlers)
+ */
+async function handleConversationDefaultExecute(
+    connection: SocketStream,
+    message: ConversationExecuteStartMessage
+) {
+    await handleLaneExecutionWithAgent(connection, message, 'generic');
+}
+
+/**
+ * Common handler for develop/test lane execution with streaming
+ * Directly uses query() like design lane for consistent behavior
+ */
+async function handleLaneExecutionWithAgent(
+    connection: SocketStream,
+    message: ConversationExecuteStartMessage,
+    laneType: 'develop' | 'test' | 'generic'
+) {
+    const { taskId } = message;
+    console.log(`[Execution] Lane execution start: ${laneType}, taskId: ${taskId}`);
+
+    const result = await findTask(taskId);
+    if (!result) {
+        connection.socket.send(JSON.stringify({
+            type: 'conversation.error',
+            taskId,
+            error: 'Task not found'
+        } as ConversationWsMessage));
+        return;
+    }
+
+    const { project, task, data } = result;
+    const workingDir = task.worktree?.path || project.path;
+    const sessionId = task.claudeSession?.id;
+
+    // Get or create conversation
+    let conversation = await conversationStorage.load(taskId);
+    if (!conversation) {
+        conversation = {
+            taskId,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            messages: [],
+        };
+    }
+
+    const laneName = laneType === 'develop' ? '开发' : laneType === 'test' ? '测试' : '执行';
+    const systemMessageId = uuid();
+    const systemMessage: ConversationMessage = {
+        id: systemMessageId,
+        role: 'system',
+        content: `[系统] 开始${laneName}任务...`,
+        type: 'info',
+        timestamp: new Date().toISOString(),
+    };
+    conversation.messages.push(systemMessage);
+    await conversationStorage.save(taskId, conversation);
+
+    // Send system message via WebSocket
+    connection.socket.send(JSON.stringify({
+        type: 'conversation.chunk_start',
+        taskId,
+        messageId: systemMessageId,
+        content: '',
+    } as ConversationWsMessage));
+
+    connection.socket.send(JSON.stringify({
+        type: 'conversation.chunk',
+        taskId,
+        messageId: systemMessageId,
+        content: systemMessage.content + '\n',
+    } as ConversationWsMessage));
+
+    connection.socket.send(JSON.stringify({
+        type: 'conversation.chunk_end',
+        taskId,
+        messageId: systemMessageId,
+    } as ConversationWsMessage));
+
+    // Create assistant message placeholder
+    const assistantMessageId = uuid();
+    const assistantMessage: ConversationMessage = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date().toISOString(),
+        status: 'streaming',
+        toolCalls: [],
+    };
+    conversation.messages.push(assistantMessage);
+    await conversationStorage.save(taskId, conversation);
+
+    connection.socket.send(JSON.stringify({
+        type: 'conversation.chunk_start',
+        taskId,
+        messageId: assistantMessageId,
+    } as ConversationWsMessage));
+
+    // Build prompt
+    const userPrompt = task.prompt || `## 任务\n\n**标题**: ${task.title}\n\n**描述**:\n${task.description}`;
+    const config = await readGlobalConfig();
+    const lanePrompt = getLanePrompt(task.laneId, data, config.settings.lanePrompts || {});
+
+    // Add design doc reference if available
+    let fullPrompt = userPrompt;
+    if (task.designPath) {
+        fullPrompt = `请按照 @${task.designPath} 中的设计方案继续执行任务。\n\n${userPrompt}`;
+    }
+
+    // Combine with lane prompt
+    const prompt = lanePrompt
+        ? `${lanePrompt}\n\n---\n\n${fullPrompt}`
+        : fullPrompt;
+
+    // Track accumulated content and tool calls
+    let accumulatedContent = '';
+    const toolCallsMap = new Map<string, any>();
+
+    // Get output format for this lane
+    const outputFormat = getSchemaForLane(task.laneId);
+
+    // Determine allowed tools based on task's lane
+    const allowedTools = task.laneId === 'design'
+        ? ['Read', 'Glob', 'Grep']
+        : ['Bash', 'Read', 'Edit', 'Glob', 'Grep', 'Find', 'Write'];
+
+    console.log(`[Execution] ${laneName} execution with query(), sessionId:`, sessionId);
+    console.log(`[Execution] Prompt length:`, prompt.length);
+    console.log(`[Execution] Allowed tools:`, allowedTools);
+    console.log(`[Execution] Output format:`, outputFormat ? 'enabled' : 'none');
+
+    // Build query options
+    const queryOptions: Record<string, unknown> = {
+        allowedTools,
+        settingSources: ['project'],
+        cwd: workingDir,
+        resume: sessionId,
+        permissionMode: 'default',  // Auto-approve tool permissions
+    };
+
+    // Add output format if provided
+    if (outputFormat) {
+        (queryOptions as any).outputFormat = outputFormat;
+    }
+
+    // Use query() for streaming, consistent with design lane
+    try {
+        for await (const sdkMessage of query({
+            prompt,
+            options: queryOptions,
+        })) {
+            console.log(`[Execution] ${laneName} message type:`, sdkMessage.type);
+
+            // Track session ID
+            if ((sdkMessage as any).session_id) {
+                const newSessionId = (sdkMessage as any).session_id;
+                if (!task.claudeSession || task.claudeSession.id !== newSessionId) {
+                    task.claudeSession = {
+                        id: newSessionId,
+                        createdAt: new Date().toISOString(),
+                    };
+                    await writeProjectData(project.path, data);
+                    console.log(`[Execution] Session saved to task:`, newSessionId);
+                }
+            }
+
+            // Handle stream events (most content comes through here)
+            if (sdkMessage.type === 'stream_event') {
+                const event = (sdkMessage as any).event;
+
+                // Text content streaming
+                if (event?.type === 'content_block_start' && event.block?.type === 'text') {
+                    console.log(`[Execution] content_block_start`);
+                    // Send empty chunk to signal start
+                    connection.socket.send(JSON.stringify({
+                        type: 'conversation.chunk',
+                        taskId,
+                        messageId: assistantMessageId,
+                        content: '',
+                    } as ConversationWsMessage));
+                } else if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+                    const delta = event.delta.text || '';
+                    accumulatedContent += delta;
+                    console.log(`[Execution] text_delta, length:`, delta.length);
+                    connection.socket.send(JSON.stringify({
+                        type: 'conversation.chunk',
+                        taskId,
+                        messageId: assistantMessageId,
+                        content: delta,
+                    } as ConversationWsMessage));
+                } else if (event?.type === 'content_block_stop') {
+                    console.log(`[Execution] content_block_stop`);
+                    // Update conversation storage
+                    const conv = await conversationStorage.load(taskId);
+                    if (conv) {
+                        const msg = conv.messages.find((m: any) => m.id === assistantMessageId);
+                        if (msg && msg.role === 'assistant') {
+                            (msg as any).content = accumulatedContent;
+                            (msg as any).status = 'streaming';
+                            await conversationStorage.save(taskId, conv);
+                        }
+                    }
+                }
+            }
+
+            // Handle assistant messages (tool use, text blocks)
+            else if (sdkMessage.type === 'assistant') {
+                const content = (sdkMessage as any).message?.content;
+                if (Array.isArray(content)) {
+                    for (const block of content) {
+                        if (block.type === 'text') {
+                            console.log(`[Execution] assistant text block, length:`, block.text?.length || 0);
+                            accumulatedContent += block.text || '';
+                            connection.socket.send(JSON.stringify({
+                                type: 'conversation.chunk',
+                                taskId,
+                                messageId: assistantMessageId,
+                                content: block.text || '',
+                            } as ConversationWsMessage));
+                        } else if (block.type === 'tool_use') {
+                            const toolName = block.name;
+                            const toolInput = block.input;
+                            const toolId = `${assistantMessageId}-${toolName}`;
+
+                            const toolCall: ToolCall = {
+                                name: toolName,
+                                input: toolInput,
+                                status: 'pending',
+                            };
+                            toolCallsMap.set(toolId, toolCall);
+                            console.log(`[Execution] tool_use:`, toolName);
+
+                            connection.socket.send(JSON.stringify({
+                                type: 'conversation.tool_call',
+                                taskId,
+                                toolCall,
+                            } as ConversationWsMessage));
+                        }
+                    }
+                }
+            }
+
+            // Handle user messages (tool results)
+            else if (sdkMessage.type === 'user') {
+                const content = (sdkMessage as any).message?.content;
+                if (Array.isArray(content)) {
+                    for (const block of content) {
+                        if (block.type === 'tool_result') {
+                            const toolName = block.name;
+                            const toolId = `${assistantMessageId}-${toolName}`;
+                            const toolCall = toolCallsMap.get(toolId);
+                            if (toolCall) {
+                                toolCall.status = block.is_error ? 'error' : 'success';
+                                toolCall.output = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
+                                console.log(`[Execution] tool_result:`, toolName, 'status:', toolCall.status);
+
+                                connection.socket.send(JSON.stringify({
+                                    type: 'conversation.tool_call',
+                                    taskId,
+                                    toolCall,
+                                } as ConversationWsMessage));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Handle result
+            else if (sdkMessage.type === 'result') {
+                console.log(`[Execution] ${laneName} execution completed, content length:`, accumulatedContent.length);
+
+                // Check for structured output
+                if ((sdkMessage as any).structured_output) {
+                    console.log(`[Execution] Structured output received:`, JSON.stringify((sdkMessage as any).structured_output, null, 2));
+
+                    // Save to task
+                    const outputType = getOutputTypeForLane(task.laneId);
+                    task.structuredOutput = {
+                        type: outputType,
+                        schemaVersion: '1.0',
+                        data: (sdkMessage as any).structured_output,
+                        timestamp: new Date().toISOString(),
+                    } as StructuredOutput;
+                    await writeProjectData(project.path, data);
+
+                    // Send to frontend
+                    connection.socket.send(JSON.stringify({
+                        type: 'structured-output',
+                        taskId,
+                        output: (sdkMessage as any).structured_output,
+                    } as ConversationWsMessage));
+                }
+
+                // Mark assistant message as complete
+                const conv = await conversationStorage.load(taskId);
+                if (conv) {
+                    const msg = conv.messages.find((m: any) => m.id === assistantMessageId);
+                    if (msg && msg.role === 'assistant') {
+                        (msg as any).content = accumulatedContent;
+                        (msg as any).status = 'complete';
+                        if (toolCallsMap.size > 0) {
+                            (msg as any).toolCalls = Array.from(toolCallsMap.values());
+                        }
+                        await conversationStorage.save(taskId, conv);
+                    }
+                }
+
+                connection.socket.send(JSON.stringify({
+                    type: 'conversation.chunk_end',
+                    taskId,
+                    messageId: assistantMessageId,
+                } as ConversationWsMessage));
+
+                // Add completion message to conversation
+                const completeMessage: ConversationMessage = {
+                    id: uuid(),
+                    role: 'system',
+                    content: `[系统] ${laneName}任务已完成`,
+                    type: 'info',
+                    timestamp: new Date().toISOString(),
+                };
+                const finalConv = await conversationStorage.load(taskId);
+                if (finalConv) {
+                    finalConv.messages.push(completeMessage);
+                    await conversationStorage.save(taskId, finalConv);
+                }
+
+                connection.socket.send(JSON.stringify({
+                    type: 'conversation.execute_complete',
+                    taskId,
+                    structuredOutput: task.structuredOutput,
+                    content: completeMessage.content,
+                } as ConversationWsMessage));
+
+                console.log(`[Execution] ${laneName} execution completed successfully`);
+            }
+        }
+    } catch (error: any) {
+        console.error(`[Execution] ${laneName} execution error:`, error);
 
         // Save error to conversation
         const conv = await conversationStorage.load(taskId);

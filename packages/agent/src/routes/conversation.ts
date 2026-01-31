@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
-import { conversationStorage } from '../services/conversation-storage.js';
-import { readGlobalConfig } from '../utils/json-store.js';
+import { conversationStorage } from '../services/conversation-storage';
+import { readGlobalConfig } from '../utils/json-store';
 import type { Conversation, ConversationMessage } from '@antiwarden/shared';
 
 export async function conversationRoutes(fastify: FastifyInstance) {

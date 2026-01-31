@@ -67,15 +67,19 @@ export interface Attachment {
 
 // WebSocket message types for conversation
 export interface ConversationWsMessage {
-    type: 'conversation.user_input' | 'conversation.design_start' | 'conversation.chunk_start' | 'conversation.chunk' |
+    type: 'conversation.user_input' | 'conversation.execute_start' | 'conversation.design_start' | 'conversation.chunk_start' | 'conversation.chunk' |
            'conversation.chunk_end' | 'conversation.thinking_start' | 'conversation.thinking_end' |
-           'conversation.tool_call' | 'conversation.error' | 'conversation.design_complete';
+           'conversation.tool_call' | 'conversation.error' | 'conversation.design_complete' | 'conversation.execute_complete' |
+           'structured-output';
     taskId: string;
+    projectId?: string;
     messageId?: string;
     content?: string;
     toolCall?: ToolCall;
     error?: string;
     designPath?: string;  // For design_complete
+    structuredOutput?: unknown;  // For execute_complete or structured-output
+    output?: unknown;  // For structured-output
 }
 
 // Slash command definitions

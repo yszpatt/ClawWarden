@@ -35,7 +35,6 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
 
     const {
         connect,
-        execute,
         attach,
         sendInput,
         stop,
@@ -229,12 +228,20 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
             return;
         }
 
-        // Connect and execute when ready
-        connect(() => {
-            execute();
-            setIsRunningState(true);
-            onStatusChange?.('running');
+        // Switch to conversation tab
+        setActiveTab('conversation');
+
+        // Ensure WebSocket is connected
+        connectionManager.connect();
+
+        // Send conversation.execute_start message
+        connectionManager.send({
+            type: 'conversation.execute_start',
+            taskId: task.id,
+            projectId,
         });
+
+        console.log('[TaskDetail] Sent conversation.execute_start message for lane:', task.laneId);
     };
 
     const handleStop = () => {
