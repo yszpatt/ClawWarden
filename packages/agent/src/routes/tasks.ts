@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { v4 as uuid } from 'uuid';
 import { readGlobalConfig, readProjectData, writeProjectData } from '../utils/json-store';
+import { worktreeManager } from '../services/worktree-manager';
 import type { Task } from '@antiwarden/shared';
 
 export async function taskRoutes(fastify: FastifyInstance) {
@@ -16,8 +17,9 @@ export async function taskRoutes(fastify: FastifyInstance) {
         const data = await readProjectData(project.path);
         const laneTasks = data.tasks.filter(t => t.laneId === request.body.laneId);
 
+        const taskId = uuid();
         const task: Task = {
-            id: uuid(),
+            id: taskId,
             title: request.body.title,
             description: request.body.description,
             prompt: request.body.prompt,
@@ -29,9 +31,36 @@ export async function taskRoutes(fastify: FastifyInstance) {
             createdBy: 'user',
         };
 
+        // Create worktree immediately for the task
+        try {
+            const worktree = await worktreeManager.createWorktree(project.path, taskId);
+            if (worktree) {
+                task.worktree = worktree;
+                console.log(`[Tasks] Created worktree for task ${taskId}:`, worktree.path);
+            }
+        } catch (error) {
+            console.error(`[Tasks] Failed to create worktree for task ${taskId}:`, error);
+            // Continue without worktree - non-fatal
+        }
+
         data.tasks.push(task);
         await writeProjectData(project.path, data);
         return task;
+    });
+
+    // Get single task
+    fastify.get<{
+        Params: { projectId: string; taskId: string };
+    }>('/api/projects/:projectId/tasks/:taskId', async (request) => {
+        const config = await readGlobalConfig();
+        const project = config.projects.find(p => p.id === request.params.projectId);
+        if (!project) throw { statusCode: 404, message: 'Project not found' };
+
+        const data = await readProjectData(project.path);
+        const task = data.tasks.find(t => t.id === request.params.taskId);
+        if (!task) throw { statusCode: 404, message: 'Task not found' };
+
+        return { task };
     });
 
     // Update task
@@ -108,4 +137,79 @@ export async function taskRoutes(fastify: FastifyInstance) {
         await writeProjectData(project.path, data);
         return task;
     });
+    // Batch update tasks (for drag-drop syncing)
+    fastify.put<{
+        Params: { projectId: string };
+        Body: { updates: { id: string; laneId?: string; order?: number }[] };
+    }>('/api/projects/:projectId/tasks/batch', async (request) => {
+        const config = await readGlobalConfig();
+        const project = config.projects.find(p => p.id === request.params.projectId);
+        if (!project) throw { statusCode: 404, message: 'Project not found' };
+
+        const data = await readProjectData(project.path);
+        const updates = request.body.updates;
+        const now = new Date().toISOString();
+
+        // Check for running tasks - prevent moving them
+        for (const update of updates) {
+            const task = data.tasks.find(t => t.id === update.id);
+            if (task && task.status === 'running' && update.laneId && update.laneId !== task.laneId) {
+                throw { statusCode: 400, message: '运行中的任务无法移动，请先停止任务' };
+            }
+        }
+
+        // Apply updates and track lane changes for worktree creation
+        const worktreeCreations: { taskId: string; projectPath: string }[] = [];
+
+        for (const update of updates) {
+            const taskIndex = data.tasks.findIndex(t => t.id === update.id);
+            if (taskIndex !== -1) {
+                const task = data.tasks[taskIndex];
+                const oldLaneId = task.laneId;
+                const newLaneId = update.laneId || oldLaneId;
+
+                // Check if moving TO develop or test lane from a different lane
+                const isMovingToDev = (newLaneId === 'develop' || newLaneId === 'test') && oldLaneId !== newLaneId;
+
+                // If moving to dev/test and no worktree exists, schedule worktree creation
+                if (isMovingToDev && !task.worktree) {
+                    worktreeCreations.push({ taskId: task.id, projectPath: project.path });
+                }
+
+                data.tasks[taskIndex] = {
+                    ...task,
+                    ...update,
+                    updatedAt: now,
+                };
+            }
+        }
+
+        await writeProjectData(project.path, data);
+
+        // Create worktrees for tasks that moved to develop/test
+        // Import worktree manager dynamically to avoid circular deps
+        if (worktreeCreations.length > 0) {
+            const { worktreeManager } = await import('../services/worktree-manager');
+            for (const wt of worktreeCreations) {
+                try {
+                    const worktree = await worktreeManager.createWorktree(wt.projectPath, wt.taskId);
+                    // Update task with worktree info (only if worktree was created)
+                    if (worktree) {
+                        const taskIndex = data.tasks.findIndex(t => t.id === wt.taskId);
+                        if (taskIndex !== -1) {
+                            data.tasks[taskIndex].worktree = worktree;
+                            data.tasks[taskIndex].updatedAt = new Date().toISOString();
+                        }
+                    }
+                } catch (error) {
+                    console.error(`Failed to create worktree for task ${wt.taskId}:`, error);
+                }
+            }
+            // Save again with worktree info
+            await writeProjectData(project.path, data);
+        }
+
+        return { success: true };
+    });
 }
+

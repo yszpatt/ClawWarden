@@ -2,12 +2,15 @@ import { useState, useEffect } from 'react';
 import { Layout } from './components/Layout';
 import { KanbanBoard } from './components/KanbanBoard';
 import { TaskDetail } from './components/TaskDetail';
+import { TaskForm } from './components/TaskForm';
 import { ProjectSelector } from './components/ProjectSelector';
+import { SettingsModal } from './components/SettingsModal';
+import { ConnectionProvider } from './context/ConnectionContext';
 import { useAppStore } from './stores/appStore';
 import { DEFAULT_LANES } from '@antiwarden/shared';
 import type { Task } from '@antiwarden/shared';
 import type { ProjectRef } from './api/projects';
-import { fetchProjectData } from './api/projects';
+import { fetchProjectData, createTask } from './api/projects';
 import './index.css';
 
 function App() {
@@ -20,9 +23,13 @@ function App() {
     setCurrentProject,
     projectData,
     setProjectData,
+    addTask,
+    moveTask,
   } = useAppStore();
 
   const [loading, setLoading] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Load project data when a project is selected
   useEffect(() => {
@@ -52,6 +59,25 @@ function App() {
     setProjectData(null);
   };
 
+  const handleAddTask = () => {
+    setShowTaskForm(true);
+  };
+
+  const handleCreateTask = async (taskData: { title: string; description: string; prompt: string }) => {
+    if (!currentProject) return;
+
+    try {
+      const newTask = await createTask(currentProject.id, {
+        ...taskData,
+        laneId: 'design', // Default to design lane
+      });
+      addTask(newTask);
+      setShowTaskForm(false);
+    } catch (err) {
+      console.error('Failed to create task:', err);
+    }
+  };
+
   // Show project selector if no project is selected
   if (!currentProject) {
     return <ProjectSelector onSelectProject={handleSelectProject} />;
@@ -65,40 +91,53 @@ function App() {
     selectTask(task.id);
   };
 
-  const handleAddTask = () => {
-    // TODO: Open task creation modal
-    console.log('Add task clicked');
-  };
-
   return (
-    <Layout
-      projectName={currentProject.name}
-      sidebarOpen={sidebarOpen}
-      sidebarTitle={selectedTask ? '任务详情' : undefined}
-      onSidebarClose={closeSidebar}
-      onBackToProjects={handleBackToProjects}
-      sidebarContent={
-        selectedTask ? (
-          <TaskDetail
-            task={selectedTask}
-            onExecute={() => console.log('Execute task:', selectedTask.id)}
-            onStop={() => console.log('Stop task:', selectedTask.id)}
+    <ConnectionProvider>
+      <Layout
+        projectName={currentProject.name}
+        sidebarOpen={sidebarOpen}
+        sidebarTitle={selectedTask ? '任务详情' : undefined}
+        onSidebarClose={closeSidebar}
+        onBackToProjects={handleBackToProjects}
+        onSettingsClick={() => setShowSettings(true)}
+        sidebarWide={!!selectedTask}
+        sidebarContent={
+          selectedTask ? (
+            <TaskDetail
+              task={selectedTask}
+              projectId={currentProject!.id}
+              onStatusChange={(status) => {
+                // Update local status immediately
+                // In a real app we might rely on the file watcher or refetch
+                console.log('Task status changed:', status);
+              }}
+            />
+          ) : null
+        }
+      >
+        {loading ? (
+          <div className="loading-state">加载项目数据...</div>
+        ) : (
+          <KanbanBoard
+            lanes={lanes}
+            tasks={tasks}
+            selectedTaskId={selectedTaskId || undefined}
+            onTaskClick={handleTaskClick}
+            onAddTask={handleAddTask}
+            onMoveTask={moveTask}
           />
-        ) : null
-      }
-    >
-      {loading ? (
-        <div className="loading-state">加载项目数据...</div>
-      ) : (
-        <KanbanBoard
-          lanes={lanes}
-          tasks={tasks}
-          selectedTaskId={selectedTaskId || undefined}
-          onTaskClick={handleTaskClick}
-          onAddTask={handleAddTask}
+        )}
+      </Layout>
+
+      {showTaskForm && (
+        <TaskForm
+          onSubmit={handleCreateTask}
+          onClose={() => setShowTaskForm(false)}
         />
       )}
-    </Layout>
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+    </ConnectionProvider>
   );
 }
 

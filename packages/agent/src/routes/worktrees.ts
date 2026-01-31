@@ -28,6 +28,10 @@ export async function worktreeRoutes(fastify: FastifyInstance) {
             request.body.baseBranch
         );
 
+        if (!worktree) {
+            throw { statusCode: 400, message: 'Project is not a git repository, cannot create worktree' };
+        }
+
         // Update task with worktree info
         task.worktree = worktree;
         task.updatedAt = new Date().toISOString();

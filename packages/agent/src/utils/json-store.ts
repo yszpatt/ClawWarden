@@ -2,7 +2,7 @@ import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { dirname } from 'path';
 import type { GlobalConfig, ProjectData } from '@antiwarden/shared';
-import { DEFAULT_LANES } from '@antiwarden/shared';
+import { DEFAULT_LANES, DEFAULT_SETTINGS } from '@antiwarden/shared';
 import { GLOBAL_CONFIG_FILE, getProjectTasksFile } from './paths';
 
 export async function ensureDir(filePath: string): Promise<void> {
@@ -17,13 +17,28 @@ export async function readGlobalConfig(): Promise<GlobalConfig> {
         const defaultConfig: GlobalConfig = {
             version: '1.0.0',
             projects: [],
-            settings: { agentPort: 3001, theme: 'dark' },
+            settings: DEFAULT_SETTINGS,
         };
         await writeGlobalConfig(defaultConfig);
         return defaultConfig;
     }
     const content = await readFile(GLOBAL_CONFIG_FILE, 'utf-8');
-    return JSON.parse(content);
+    const config = JSON.parse(content) as GlobalConfig;
+    // Deep merge with defaults for migration support
+    config.settings = {
+        ...DEFAULT_SETTINGS,
+        ...config.settings,
+        claude: { ...DEFAULT_SETTINGS.claude, ...config.settings?.claude },
+        notifications: { ...DEFAULT_SETTINGS.notifications, ...config.settings?.notifications },
+        // For lanePrompts: merge defaults with user config (user config takes priority)
+        lanePrompts: { ...DEFAULT_SETTINGS.lanePrompts, ...config.settings?.lanePrompts },
+    };
+
+    // Save merged config back to disk to ensure defaults are visible in the file
+    // This addresses the user request to have default prompts visible in config file
+    await writeGlobalConfig(config);
+
+    return config;
 }
 
 export async function writeGlobalConfig(config: GlobalConfig): Promise<void> {

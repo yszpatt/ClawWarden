@@ -45,11 +45,12 @@ interface SidebarProps {
     children: ReactNode;
     title?: string;
     onClose?: () => void;
+    wide?: boolean;
 }
 
-export function Sidebar({ children, title = '详情', onClose }: SidebarProps) {
+export function Sidebar({ children, title = '详情', onClose, wide }: SidebarProps) {
     return (
-        <aside className="app-sidebar">
+        <aside className={`app-sidebar ${wide ? 'wide' : ''}`}>
             <div className="sidebar-header">
                 <h2>{title}</h2>
                 <button className="sidebar-close" onClick={onClose}>×</button>
@@ -68,7 +69,9 @@ interface LayoutProps {
     sidebarTitle?: string;
     onSidebarClose?: () => void;
     onBackToProjects?: () => void;
+    onSettingsClick?: () => void;
     projectName?: string;
+    sidebarWide?: boolean;
 }
 
 export function Layout({
@@ -78,15 +81,17 @@ export function Layout({
     sidebarTitle,
     onSidebarClose,
     onBackToProjects,
+    onSettingsClick,
     projectName,
+    sidebarWide,
 }: LayoutProps) {
     return (
         <div className="app-layout">
-            <Header projectName={projectName} onBackToProjects={onBackToProjects} />
+            <Header projectName={projectName} onBackToProjects={onBackToProjects} onSettingsClick={onSettingsClick} />
             <div className="app-content">
                 <main className="main-content">{children}</main>
                 {sidebarOpen && sidebarContent && (
-                    <Sidebar title={sidebarTitle} onClose={onSidebarClose}>
+                    <Sidebar title={sidebarTitle} onClose={onSidebarClose} wide={sidebarWide}>
                         {sidebarContent}
                     </Sidebar>
                 )}

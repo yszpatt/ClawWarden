@@ -35,3 +35,124 @@ export async function fetchProjectData(projectId: string): Promise<{ project: Pr
     if (!res.ok) throw new Error('Failed to fetch project data');
     return res.json();
 }
+
+export async function createTask(
+    projectId: string,
+    task: { title: string; description: string; prompt?: string; laneId: string }
+): Promise<any> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(task),
+    });
+    if (!res.ok) throw new Error('Failed to create task');
+    return res.json();
+}
+
+export async function batchUpdateTasks(
+    projectId: string,
+    updates: { id: string; laneId?: string; order?: number }[]
+): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/batch`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+    });
+    if (!res.ok) throw new Error('Failed to batch update tasks');
+    return res.json();
+}
+
+export async function updateTask(
+    projectId: string,
+    taskId: string,
+    updates: Partial<any>
+): Promise<any> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update task');
+    return res.json();
+}
+
+export async function deleteTask(projectId: string, taskId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete task');
+    return res.json();
+}
+
+// Design API functions
+export async function generateDesign(
+    projectId: string,
+    taskId: string
+): Promise<{ success: boolean; designPath: string; content: string }> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}/design`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+    });
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: 'Failed to generate design' }));
+        throw new Error(error.message);
+    }
+    return res.json();
+}
+
+export async function fetchDesign(
+    projectId: string,
+    taskId: string
+): Promise<{ designPath: string; content: string }> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}/design`);
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: 'Failed to fetch design' }));
+        throw new Error(error.message);
+    }
+    return res.json();
+}
+
+export async function updateDesign(
+    projectId: string,
+    taskId: string,
+    content: string
+): Promise<{ success: boolean; designPath: string }> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}/design`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+    });
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: 'Failed to update design' }));
+        throw new Error(error.message);
+    }
+    return res.json();
+}
+
+export async function fetchTask(
+    projectId: string,
+    taskId: string
+): Promise<{ task: any }> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}`);
+    if (!res.ok) throw new Error('Failed to fetch task');
+    return res.json();
+}
+
+// Worktree API functions
+export async function mergeWorktree(
+    projectId: string,
+    taskId: string,
+    targetBranch?: string
+): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetBranch }),
+    });
+    if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: 'Failed to merge worktree' }));
+        throw new Error(error.message);
+    }
+    return res.json();
+}

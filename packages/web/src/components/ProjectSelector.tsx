@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { ProjectRef } from '../api/projects';
 import { fetchProjects, createProject } from '../api/projects';
+import { SettingsModal } from './SettingsModal';
 
 interface ProjectSelectorProps {
     onSelectProject: (project: ProjectRef) => void;
@@ -14,18 +15,25 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
     const [newName, setNewName] = useState('');
     const [newPath, setNewPath] = useState('');
     const [creating, setCreating] = useState(false);
+    const [showSettings, setShowSettings] = useState(false);
 
     useEffect(() => {
         loadProjects();
     }, []);
 
-    const loadProjects = async () => {
+    const loadProjects = async (retryCount = 0, maxRetries = 5) => {
         try {
             setLoading(true);
             setError(null);
             const data = await fetchProjects();
             setProjects(data);
         } catch (err) {
+            // Retry if the server is not ready yet (connection refused or fetch failed)
+            if (retryCount < maxRetries) {
+                const delay = 500 * Math.pow(1.5, retryCount); // Progressive delay: 500ms, 750ms, 1125ms...
+                await new Promise(resolve => setTimeout(resolve, delay));
+                return loadProjects(retryCount + 1, maxRetries);
+            }
             setError(err instanceof Error ? err.message : '加载项目失败');
         } finally {
             setLoading(false);
@@ -58,6 +66,9 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
                         <h1>🛡️ AntiWarden</h1>
                         <p>Claude Code 任务编排系统</p>
                     </div>
+                    <button className="settings-btn" onClick={() => setShowSettings(true)} title="设置">
+                        ⚙️
+                    </button>
                 </div>
 
                 {error && (
@@ -141,6 +152,8 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
                         </div>
                     </div>
                 )}
+
+                {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
             </div>
         </div>
     );

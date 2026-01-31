@@ -13,13 +13,106 @@ export interface WorktreeInfo {
 
 export class WorktreeManager {
     /**
+     * Check if a directory is a git repository
+     */
+    async isGitRepo(projectPath: string): Promise<boolean> {
+        try {
+            await execAsync('git rev-parse --git-dir', { cwd: projectPath });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Get the default branch name (main, master, or HEAD)
+     */
+    async getDefaultBranch(projectPath: string): Promise<string> {
+        try {
+            // First try to get current branch
+            const { stdout: currentBranch } = await execAsync('git branch --show-current', { cwd: projectPath });
+            if (currentBranch.trim()) {
+                return currentBranch.trim();
+            }
+
+            // Try remote HEAD
+            try {
+                const { stdout } = await execAsync('git symbolic-ref refs/remotes/origin/HEAD', { cwd: projectPath });
+                const branch = stdout.trim().replace('refs/remotes/origin/', '');
+                if (branch) return branch;
+            } catch { }
+
+            // Check if 'main' branch exists
+            try {
+                await execAsync('git rev-parse --verify main', { cwd: projectPath });
+                return 'main';
+            } catch { }
+
+            // Check if 'master' branch exists
+            try {
+                await execAsync('git rev-parse --verify master', { cwd: projectPath });
+                return 'master';
+            } catch { }
+
+            // Use HEAD as ultimate fallback
+            return 'HEAD';
+        } catch {
+            return 'HEAD';
+        }
+    }
+
+    /**
+     * Check if repository has any commits
+     */
+    async hasCommits(projectPath: string): Promise<boolean> {
+        try {
+            await execAsync('git rev-parse HEAD', { cwd: projectPath });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Ensure repository has at least one commit
+     */
+    async ensureHasCommit(projectPath: string): Promise<void> {
+        const hasCommit = await this.hasCommits(projectPath);
+        if (!hasCommit) {
+            console.log('[WorktreeManager] Repository is empty, creating initial commit...');
+            // Create a .gitignore file if it doesn't exist
+            try {
+                await execAsync('test -f .gitignore || echo "node_modules/\n.antiwarden/\n.worktrees/" > .gitignore', { cwd: projectPath });
+                await execAsync('git add -A', { cwd: projectPath });
+                await execAsync('git commit --allow-empty -m "Initial commit by AntiWarden"', { cwd: projectPath });
+                console.log('[WorktreeManager] Initial commit created');
+            } catch (error: any) {
+                console.error('[WorktreeManager] Failed to create initial commit:', error.message);
+                throw new Error('Repository has no commits and failed to create initial commit');
+            }
+        }
+    }
+
+    /**
      * Create a new worktree for a task
+     * Returns null if project is not a git repository
      */
     async createWorktree(
         projectPath: string,
         taskId: string,
-        baseBranch: string = 'master'
-    ): Promise<WorktreeInfo> {
+        baseBranch?: string
+    ): Promise<WorktreeInfo | null> {
+        // Check if project is a git repository
+        const isGit = await this.isGitRepo(projectPath);
+        if (!isGit) {
+            console.log('[WorktreeManager] Project is not a git repository, skipping worktree creation');
+            return null;
+        }
+
+        // Ensure repository has at least one commit
+        await this.ensureHasCommit(projectPath);
+
+        const defaultBranch = baseBranch || await this.getDefaultBranch(projectPath);
         const branchName = `task/${taskId}`;
         const worktreePath = join(projectPath, '.worktrees', taskId);
 
@@ -29,19 +122,46 @@ export class WorktreeManager {
             await execAsync(`mkdir -p "${worktreesDir}"`);
         }
 
-        // Create branch and worktree
+        // Check if worktree already exists
+        if (existsSync(worktreePath)) {
+            console.log('[WorktreeManager] Worktree already exists:', worktreePath);
+            return {
+                path: worktreePath,
+                branch: branchName,
+                createdAt: new Date().toISOString(),
+            };
+        }
+
+        // Check if branch already exists
+        let branchExists = false;
         try {
-            // First, try to create a new branch
-            await execAsync(
-                `git worktree add -b "${branchName}" "${worktreePath}" "${baseBranch}"`,
-                { cwd: projectPath }
-            );
-        } catch (error) {
-            // If branch already exists, just add worktree
-            await execAsync(
-                `git worktree add "${worktreePath}" "${branchName}"`,
-                { cwd: projectPath }
-            );
+            await execAsync(`git rev-parse --verify "${branchName}"`, { cwd: projectPath });
+            branchExists = true;
+        } catch {
+            branchExists = false;
+        }
+
+        console.log('[WorktreeManager] Creating worktree for task:', taskId);
+        console.log('[WorktreeManager] Branch exists:', branchExists);
+        console.log('[WorktreeManager] Base branch:', defaultBranch);
+
+        try {
+            if (branchExists) {
+                // Branch exists, just add worktree
+                await execAsync(
+                    `git worktree add "${worktreePath}" "${branchName}"`,
+                    { cwd: projectPath }
+                );
+            } else {
+                // Create new branch with worktree
+                await execAsync(
+                    `git worktree add -b "${branchName}" "${worktreePath}" "${defaultBranch}"`,
+                    { cwd: projectPath }
+                );
+            }
+        } catch (error: any) {
+            console.error('[WorktreeManager] Failed to create worktree:', error.message);
+            throw error;
         }
 
         return {
@@ -71,26 +191,90 @@ export class WorktreeManager {
         branchName: string,
         targetBranch: string = 'master'
     ): Promise<{ success: boolean; message: string }> {
-        try {
-            // Get branch from worktree
-            const taskBranch = branchName;
+        const taskBranch = branchName;
 
-            // Switch to target branch and merge
+        try {
+            // Step 0: Commit any uncommitted changes in the worktree
+            console.log(`[WorktreeManager] Step 0: Committing changes in worktree: ${worktreePath}`);
+            if (existsSync(worktreePath)) {
+                try {
+                    // Check if there are any changes to commit
+                    const { stdout: statusOutput } = await execAsync('git status --porcelain', { cwd: worktreePath });
+
+                    if (statusOutput.trim()) {
+                        console.log(`[WorktreeManager] Found uncommitted changes, committing...`);
+                        await execAsync('git add -A', { cwd: worktreePath });
+                        await execAsync('git commit -m "Task completed - auto commit by AntiWarden"', { cwd: worktreePath });
+                        console.log(`[WorktreeManager] Changes committed successfully`);
+                    } else {
+                        console.log(`[WorktreeManager] No uncommitted changes in worktree`);
+                    }
+                } catch (commitError: any) {
+                    console.log(`[WorktreeManager] Commit attempt result: ${commitError.message}`);
+                    // Continue even if commit fails (might be "nothing to commit")
+                }
+            }
+
+            // Step 1: Check if task branch has any commits ahead of target branch
+            console.log(`[WorktreeManager] Step 1: Checking for commits to merge...`);
+            try {
+                const { stdout: commitsAhead } = await execAsync(
+                    `git log "${targetBranch}".."${taskBranch}" --oneline`,
+                    { cwd: projectPath }
+                );
+
+                if (!commitsAhead.trim()) {
+                    console.log(`[WorktreeManager] No commits to merge - task branch has no new commits`);
+                    return {
+                        success: false,
+                        message: '没有需要合并的内容。任务分支没有新的提交。请确保在 worktree 中有代码变更。',
+                    };
+                }
+                console.log(`[WorktreeManager] Found commits to merge:\n${commitsAhead}`);
+            } catch (checkError: any) {
+                console.log(`[WorktreeManager] Could not check commits: ${checkError.message}`);
+                // Continue with merge attempt
+            }
+
+            // Step 2: Switch to target branch
+            console.log(`[WorktreeManager] Step 2: Switching to target branch: ${targetBranch}`);
             await execAsync(`git checkout "${targetBranch}"`, { cwd: projectPath });
 
+            // Step 3: Perform the merge
+            console.log(`[WorktreeManager] Step 3: Merging branch: ${taskBranch} into ${targetBranch}`);
             const { stdout, stderr } = await execAsync(
                 `git merge "${taskBranch}" --no-ff -m "Merge ${taskBranch} into ${targetBranch}"`,
                 { cwd: projectPath }
             );
 
-            // Remove worktree after successful merge
+            if (stderr) {
+                console.log(`[WorktreeManager] Merge stderr: ${stderr}`);
+            }
+            console.log(`[WorktreeManager] Merge stdout: ${stdout}`);
+
+            // Step 4: Verify merge was successful
+            console.log(`[WorktreeManager] Step 4: Verifying merge success...`);
+            try {
+                await execAsync(`git merge-base --is-ancestor "${taskBranch}" HEAD`, { cwd: projectPath });
+                console.log(`[WorktreeManager] Merge verified successfully`);
+            } catch (verifyError) {
+                console.error(`[WorktreeManager] Merge verification failed:`, verifyError);
+                return {
+                    success: false,
+                    message: `Merge verification failed - worktree preserved. Error: ${verifyError instanceof Error ? verifyError.message : 'Unknown error'}`,
+                };
+            }
+
+            // Step 5: Only remove worktree after verified merge
+            console.log(`[WorktreeManager] Step 5: Removing worktree: ${worktreePath}`);
             await this.removeWorktree(projectPath, worktreePath);
 
-            // Delete the branch
+            // Step 6: Delete the branch
             try {
                 await execAsync(`git branch -d "${taskBranch}"`, { cwd: projectPath });
+                console.log(`[WorktreeManager] Branch deleted: ${taskBranch}`);
             } catch {
-                // Branch might already be deleted or have unmerged changes
+                console.log(`[WorktreeManager] Could not delete branch ${taskBranch} (may be expected)`);
             }
 
             return {
@@ -99,12 +283,29 @@ export class WorktreeManager {
             };
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Merge failed';
+            console.error(`[WorktreeManager] Merge failed:`, message);
+
+            // Check if this is a merge conflict
+            if (message.includes('CONFLICT') || message.includes('Automatic merge failed')) {
+                try {
+                    await execAsync('git merge --abort', { cwd: projectPath });
+                    console.log(`[WorktreeManager] Merge aborted due to conflicts`);
+                } catch {
+                    // Ignore abort errors
+                }
+                return {
+                    success: false,
+                    message: `合并冲突: ${message}. Worktree 已保留，请手动解决冲突。`,
+                };
+            }
+
             return {
                 success: false,
                 message,
             };
         }
     }
+
 
     /**
      * List all worktrees for a project
