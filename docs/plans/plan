@@ -1,0 +1,139 @@
+泳道工作流逻辑实现方案
+概述
+实现 Kanban 看板各泳道的完整工作流逻辑，包括：
+
+设计泳道：生成设计方案文档
+开发/测试泳道：自动 worktree 管理和任务执行
+待合并泳道：合并 worktree 到主分支
+已归档泳道：任务归档
+用户审阅事项
+IMPORTANT
+
+以下关键设计决策需要您确认：
+
+设计方案文件存储位置：建议存储在项目目录下的 .antiwarden/designs/<taskId>-design.md，是否可接受？
+
+Claude Code 调用方式：
+
+方案 A：通过现有的终端执行机制 (claude --print)，输出重定向到文件
+方案 B：新建一个专用的"设计生成"API 端点，后台静默执行
+推荐方案 A（复用现有逻辑）
+任务状态扩展：
+
+当前状态：'idle' | 'running' | 'completed' | 'failed'
+需要新增：'pending-design' | 'pending-dev' | 'pending-merge'
+或者使用 metadata 字段存储更细粒度的状态？
+运行中任务的拖拽限制：在前端限制还是后端也要校验？
+
+任务状态流转图
+创建任务
+点击"开始设计"
+设计方案生成完成
+点击"开始执行"(开发/测试)
+任务执行完成
+合并成功
+执行失败
+用户停止
+idle
+running
+pending_dev
+pending_merge
+completed
+failed
+详细设计
+1. 设计泳道 (Design Lane)
+工作流
+用户创建任务 → 卡片状态为 idle（待启动）
+用户点击"开始设计" → 调用 Claude Code 生成设计方案
+设计方案保存为 .antiwarden/designs/<taskId>-design.md
+卡片状态变为 pending-dev（待开发）
+用户可在卡片详情中预览/编辑设计方案
+后端变更
+[NEW] packages/agent/src/routes/design.ts
+// POST /api/projects/:projectId/tasks/:taskId/design
+// 调用 Claude Code 生成设计方案
+// 请求体: { prompt: string }
+// 响应: { designPath: string, content: string }
+前端变更
+[MODIFY] 
+packages/web/src/components/TaskDetail.tsx
+根据 laneId 显示不同的操作按钮：
+设计泳道：显示"开始设计"按钮
+开发/测试泳道：显示"开始执行"按钮
+添加设计方案预览区域（Markdown 渲染）
+2. 开发/测试泳道 (Develop/Test Lanes)
+工作流
+卡片拖入开发/测试泳道 → 自动创建 worktree
+卡片状态保持 pending-dev
+用户点击"开始执行" → 根据设计方案执行开发任务
+运行中的卡片禁止拖拽
+用户点击"停止" → 状态回退到 pending-dev
+任务完成 → 状态变为 pending-merge，自动移到待合并泳道
+后端变更
+[MODIFY] 
+packages/agent/src/routes/tasks.ts
+在 reorder 路由中添加逻辑：
+当 targetLaneId 是 develop 或 test 时，自动调用创建 worktree
+检查任务状态，如果是 running 则拒绝移动
+[MODIFY] 
+packages/agent/src/routes/worktrees.ts
+合并完成后不自动移动到 archived，改为移动到 pending-merge
+前端变更
+[MODIFY] 
+packages/web/src/components/KanbanBoard.tsx
+在 
+handleDragEnd
+ 中检查任务状态：
+如果任务状态是 running，阻止拖拽并提示用户
+[MODIFY] 
+packages/web/src/components/TaskDetail.tsx
+设计方案文档预览（加载 .antiwarden/designs/<taskId>-design.md）
+执行日志/终端输出
+3. 待合并泳道 (Pending Merge Lane)
+工作流
+任务执行完成后自动进入此泳道
+用户点击"合并" → 调用 merge API
+合并成功 → 删除 worktree，卡片移到已归档
+合并失败 → 显示错误信息，卡片保持在待合并
+后端变更
+[MODIFY] 
+packages/agent/src/routes/worktrees.ts
+合并路由 /api/projects/:projectId/tasks/:taskId/merge 已存在
+修改：合并成功后状态设为 completed，泳道设为 archived
+前端变更
+[MODIFY] 
+packages/web/src/components/TaskDetail.tsx
+待合并泳道：显示"合并到主分支"按钮
+显示 worktree 信息（分支名、路径）
+4. 已归档泳道 (Archived Lane)
+工作流
+只读展示已完成的任务
+可以删除任务
+类型变更
+[MODIFY] 
+packages/shared/src/types/task.ts
+- export type TaskStatus = 'idle' | 'running' | 'completed' | 'failed';
++ export type TaskStatus = 'idle' | 'running' | 'completed' | 'failed' | 'pending-dev' | 'pending-merge';
+  export interface Task {
+      // ... existing fields
++     designPath?: string;  // 设计方案文件路径
+  }
+API 汇总
+方法	路径	描述
+POST	/api/projects/:projectId/tasks/:taskId/design	生成设计方案
+GET	/api/projects/:projectId/tasks/:taskId/design	获取设计方案内容
+PUT	/api/projects/:projectId/tasks/:taskId/design	更新设计方案
+POST	/api/projects/:projectId/tasks/:taskId/worktree	创建 worktree（已存在）
+POST	/api/projects/:projectId/tasks/:taskId/merge	合并 worktree（已存在）
+验证计划
+自动化测试
+创建任务 → 验证状态为 idle
+点击"开始设计" → 验证设计文件生成
+拖到开发泳道 → 验证 worktree 创建
+点击"开始执行" → 验证终端执行
+停止执行 → 验证状态回退
+合并 → 验证 worktree 删除和归档
+手动验证
+完整走一遍从设计到归档的流程
+验证运行中任务无法拖拽
+验证设计方案的编辑功能

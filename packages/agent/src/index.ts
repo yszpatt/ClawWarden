@@ -21,7 +21,12 @@ console.error = function (...args) {
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 4001;
 
-
+// Set valid editor for SDK (GIT_EDITOR=true causes editor startup to fail)
+// Use a no-op editor command since we handle edits programmatically
+if (!process.env.EDITOR || process.env.GIT_EDITOR === 'true') {
+    process.env.EDITOR = '/usr/bin/vim';
+    process.env.GIT_EDITOR = '/usr/bin/vim';
+}
 
 async function main() {
     const server = await createServer();
