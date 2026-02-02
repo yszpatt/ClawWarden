@@ -2,7 +2,6 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join, basename } from 'path';
 import { existsSync, rmSync } from 'fs';
-import { conversationStorage } from './conversation-storage';
 
 const execAsync = promisify(exec);
 
@@ -10,6 +9,7 @@ export interface WorktreeInfo {
     path: string;
     branch: string;
     createdAt: string;
+    removedAt?: string;  // When worktree was deleted (for historical tracking)
 }
 
 export class WorktreeManager {
@@ -174,12 +174,9 @@ export class WorktreeManager {
 
     /**
      * Remove a worktree
-     * Also deletes the associated session file
+     * Note: Conversation history is preserved in project directory
      */
     async removeWorktree(projectPath: string, worktreePath: string): Promise<void> {
-        // Extract taskId from worktreePath (format: {projectPath}/.worktrees/{taskId})
-        const taskId = basename(worktreePath);
-
         // Remove the git worktree
         if (existsSync(worktreePath)) {
             await execAsync(`git worktree remove "${worktreePath}" --force`, {
@@ -188,13 +185,9 @@ export class WorktreeManager {
             console.log(`[WorktreeManager] Removed worktree: ${worktreePath}`);
         }
 
-        // Delete the associated session file
-        try {
-            await conversationStorage.delete(projectPath, taskId);
-            console.log(`[WorktreeManager] Deleted session file for task: ${taskId}`);
-        } catch (error) {
-            console.log(`[WorktreeManager] Could not delete session file (may not exist): ${error}`);
-        }
+        // Note: We do NOT delete the conversation history here
+        // Conversation history is stored in {projectPath}/.antiwarden/sessions/
+        // and should be preserved even after worktree is removed
     }
 
     /**

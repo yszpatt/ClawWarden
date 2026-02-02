@@ -11,6 +11,7 @@ export interface Worktree {
     path: string;
     branch: string;
     createdAt: string;
+    removedAt?: string;  // When worktree was deleted (for historical tracking)
 }
 
 export interface ClaudeSession {

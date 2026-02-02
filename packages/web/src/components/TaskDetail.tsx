@@ -491,7 +491,8 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         );
     };
 
-    const showTerminal = task.laneId === 'design' || task.laneId === 'develop' || task.laneId === 'test';
+    // Always show conversation panel for all lanes - conversation history is valuable
+    const showTerminal = true;
 
     return (
         <div className="task-detail" style={{
@@ -640,10 +641,14 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
 
                 {task.worktree && (
                     <div className="form-group">
-                        <label className="form-label">Worktree</label>
-                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
+                        <label className="form-label">
+                            Worktree {task.worktree.removedAt && <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal' }}>(已删除)</span>}
+                        </label>
+                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', background: task.worktree.removedAt ? 'var(--bg-secondary)' : 'var(--bg-tertiary)', color: 'var(--text-primary)', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', opacity: task.worktree.removedAt ? 0.7 : 1 }}>
                             <div>Path: {task.worktree.path}</div>
                             <div>Branch: {task.worktree.branch}</div>
+                            <div>Created: {new Date(task.worktree.createdAt).toLocaleString()}</div>
+                            {task.worktree.removedAt && <div style={{ color: '#EF4444' }}>Removed: {new Date(task.worktree.removedAt).toLocaleString()}</div>}
                         </div>
                     </div>
                 )}

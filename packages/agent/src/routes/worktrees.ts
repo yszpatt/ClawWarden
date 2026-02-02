@@ -65,8 +65,10 @@ export async function worktreeRoutes(fastify: FastifyInstance) {
         );
 
         if (result.success) {
-            // Update task: remove worktree info, move to archived
-            task.worktree = undefined;
+            // Update task: mark worktree as removed but keep info for historical tracking
+            if (task.worktree) {
+                task.worktree.removedAt = new Date().toISOString();
+            }
             task.laneId = 'archived';
             task.status = 'completed';
             task.updatedAt = new Date().toISOString();
@@ -90,7 +92,8 @@ export async function worktreeRoutes(fastify: FastifyInstance) {
 
         if (task.worktree) {
             await worktreeManager.removeWorktree(project.path, task.worktree.path);
-            task.worktree = undefined;
+            // Mark worktree as removed but keep info for historical tracking
+            task.worktree.removedAt = new Date().toISOString();
             task.updatedAt = new Date().toISOString();
             await writeProjectData(project.path, data);
         }

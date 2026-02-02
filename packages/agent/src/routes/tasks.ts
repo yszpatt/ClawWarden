@@ -2,8 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { v4 as uuid } from 'uuid';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { promises as fs } from 'fs';
+import path from 'path';
 import { readGlobalConfig, readProjectData, writeProjectData } from '../utils/json-store';
 import { worktreeManager } from '../services/worktree-manager';
+import { conversationStorage } from '../services/conversation-storage';
 import type { Task } from '@antiwarden/shared';
 
 const execAsync = promisify(exec);
@@ -100,11 +103,12 @@ export async function taskRoutes(fastify: FastifyInstance) {
 
         const data = await readProjectData(project.path);
         const task = data.tasks.find(t => t.id === request.params.taskId);
+        const taskId = request.params.taskId;
 
         // Delete worktree if exists
         if (task?.worktree) {
             try {
-                console.log(`[Tasks] Removing worktree for task ${request.params.taskId}:`, task.worktree.path);
+                console.log(`[Tasks] Removing worktree for task ${taskId}:`, task.worktree.path);
                 await worktreeManager.removeWorktree(project.path, task.worktree.path);
 
                 // Also delete the branch
@@ -120,7 +124,24 @@ export async function taskRoutes(fastify: FastifyInstance) {
             }
         }
 
-        data.tasks = data.tasks.filter(t => t.id !== request.params.taskId);
+        // Delete conversation session
+        try {
+            await conversationStorage.delete(project.path, taskId);
+            console.log(`[Tasks] Deleted conversation session for task: ${taskId}`);
+        } catch (error: any) {
+            console.log(`[Tasks] Could not delete conversation session: ${error.message}`);
+        }
+
+        // Delete design file if exists
+        try {
+            const designPath = path.join(project.path, '.antiwarden', 'designs', `${taskId}-design.md`);
+            await fs.unlink(designPath);
+            console.log(`[Tasks] Deleted design file for task: ${taskId}`);
+        } catch (error: any) {
+            // Design file may not exist, ignore
+        }
+
+        data.tasks = data.tasks.filter(t => t.id !== taskId);
         await writeProjectData(project.path, data);
         return { success: true };
     });

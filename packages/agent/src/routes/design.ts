@@ -20,9 +20,8 @@ export async function designRoutes(fastify: FastifyInstance) {
             throw { statusCode: 404, message: 'Design document not found' };
         }
 
-        // Use worktree path if available, otherwise project path
-        const workingDir = task.worktree?.path || project.path;
-        const designFullPath = path.join(workingDir, task.designPath);
+        // Design files are now stored in project directory: {projectPath}/.antiwarden/designs/
+        const designFullPath = path.join(project.path, task.designPath);
         const content = await fs.readFile(designFullPath, 'utf-8');
 
         return {
@@ -48,9 +47,8 @@ export async function designRoutes(fastify: FastifyInstance) {
             throw { statusCode: 400, message: 'Task has no design document' };
         }
 
-        // Use worktree path if available, otherwise project path
-        const workingDir = task.worktree?.path || project.path;
-        const designFullPath = path.join(workingDir, task.designPath);
+        // Design files are now stored in project directory: {projectPath}/.antiwarden/designs/
+        const designFullPath = path.join(project.path, task.designPath);
         await fs.writeFile(designFullPath, request.body.content, 'utf-8');
 
         task.updatedAt = new Date().toISOString();

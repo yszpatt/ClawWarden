@@ -12,6 +12,10 @@ import { getSchemaForLane, getOutputTypeForLane } from '../services/schemas';
 import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task, ToolCall, AssistantMessage } from '@antiwarden/shared';
 import { getLanePrompt } from '@antiwarden/shared';
 
+// Track running lane executions for stop functionality
+// Maps taskId to an abort controller or stop flag
+const runningLaneExecutions = new Map<string, { stopped: boolean; connection: SocketStream }>();
+
 /**
  * Send a WebSocket message and immediately save to conversation storage
  */
@@ -474,8 +478,53 @@ function handleInput(taskId: string, data: string) {
     agentManager.sendInput(taskId, data);
 }
 
-function handleStop(taskId: string) {
+async function handleStop(taskId: string) {
+    // First, try to stop agent manager sessions (conversation panel)
     agentManager.stopTask(taskId);
+
+    // Also check if this is a lane execution and stop it
+    const laneExecution = runningLaneExecutions.get(taskId);
+    if (laneExecution) {
+        console.log(`[Execution] Stopping lane execution for task: ${taskId}`);
+        laneExecution.stopped = true;
+
+        // Find the task to get its laneId and update status in storage
+        const result = await findTask(taskId);
+        let laneId: string | undefined;
+        if (result) {
+            // Update task status to idle in storage
+            result.task.status = 'idle';
+            result.task.updatedAt = new Date().toISOString();
+            await writeProjectData(result.project.path, result.data);
+            console.log(`[Execution] Updated task ${taskId} status to idle in storage`);
+            laneId = result.task.laneId;
+
+            // Add stop message to conversation
+            const stopMessage: ConversationMessage = {
+                id: uuid(),
+                role: 'system',
+                content: '[系统] 任务已被用户停止',
+                type: 'info',
+                timestamp: new Date().toISOString(),
+            };
+            await sendAndSaveMessage(laneExecution.connection, taskId, result.project.path, stopMessage);
+        }
+
+        // Send stop confirmation to client with laneId
+        if (laneExecution.connection.socket.readyState === 1) {
+            laneExecution.connection.socket.send(JSON.stringify({
+                type: 'task_status',
+                taskId,
+                status: 'idle',
+                laneId,
+            } as ConversationWsMessage));
+        }
+
+        // Remove from tracking after a short delay
+        setTimeout(() => {
+            runningLaneExecutions.delete(taskId);
+        }, 1000);
+    }
 }
 
 // Helper to find task across all projects
@@ -843,69 +892,123 @@ async function handleConversationDesignStart(
 
             // Handle result
             else if (sdkMessage.type === 'result') {
-                console.log('[Execution] Design generation completed, content length:', currentTextContent.length);
+                console.log('[Execution] Design generation completed, content length:', currentTextContent.length, 'subtype:', (sdkMessage as any).subtype);
 
-                // Send chunk_end
-                connection.socket.send(JSON.stringify({
-                    type: 'conversation.chunk_end',
-                    taskId,
-                    groupId,
-                } as ConversationWsMessage));
+                // Check if execution was successful
+                const subtype = (sdkMessage as any).subtype;
+                if (subtype === 'error_during_execution') {
+                    // Execution failed - don't save design or move lane
+                    const errors = (sdkMessage as any).errors || ['Unknown error'];
+                    const errorMessage = errors.join('\n');
 
-                // Save design to file
-                const designsDir = path.join(workingDir, '.antiwarden', 'designs');
-                await fs.mkdir(designsDir, { recursive: true });
-                const designFileName = `${task.id}-design.md`;
-                const designPath = path.join(designsDir, designFileName);
-                await fs.writeFile(designPath, currentTextContent, 'utf-8');
-
-                // Update task status and move to develop lane
-                task.status = 'idle';
-                task.laneId = 'develop';
-                task.designPath = path.relative(workingDir, designPath);
-                task.updatedAt = new Date().toISOString();
-                await writeProjectData(project.path, data);
-
-                // Send status update notification to frontend
-                if (connection.socket.readyState === 1) {
-                    connection.socket.send(JSON.stringify({
-                        type: 'task_status',
-                        taskId: taskId,
-                        status: 'idle',
-                        laneId: 'develop'
-                    }));
-                }
-
-                // Add completion system message
-                const completeMessage: ConversationMessage = {
-                    id: uuid(),
-                    role: 'system',
-                    content: `[系统] 设计方案已生成并保存到: ${task.designPath}，任务已移至开发泳道`,
-                    type: 'info',
-                    timestamp: new Date().toISOString(),
-                };
-                await sendAndSaveMessage(connection, taskId, projectPath, completeMessage);
-
-                connection.socket.send(JSON.stringify({
-                    type: 'conversation.design_complete',
-                    taskId,
-                    designPath: task.designPath,
-                    content: completeMessage.content,
-                } as ConversationWsMessage));
-
-                // Also send structured-output if design contains structured data
-                const structuredOutput = parseDesignToStructuredOutput(currentTextContent, task);
-                if (structuredOutput) {
-                    task.structuredOutput = structuredOutput;
+                    // Update task status to failed
+                    task.status = 'failed';
+                    task.updatedAt = new Date().toISOString();
                     await writeProjectData(project.path, data);
-                    connection.socket.send(JSON.stringify({
-                        type: 'structured-output',
-                        taskId,
-                        output: structuredOutput,
-                    }));
-                }
 
-                console.log('[Execution] Design saved, task updated, conversation persisted');
+                    // Send status update
+                    if (connection.socket.readyState === 1) {
+                        connection.socket.send(JSON.stringify({
+                            type: 'task_status',
+                            taskId,
+                            status: 'failed',
+                        } as ConversationWsMessage));
+                    }
+
+                    // Add error message to conversation
+                    const errorMsg: ConversationMessage = {
+                        id: uuid(),
+                        role: 'system',
+                        content: `错误: ${errorMessage}`,
+                        type: 'error',
+                        timestamp: new Date().toISOString(),
+                    };
+                    await sendAndSaveMessage(connection, taskId, projectPath, errorMsg);
+
+                    console.log('[Execution] Design generation failed:', errorMessage);
+                } else {
+                    // Success - save design and move to next lane
+                    // Send chunk_end
+                    connection.socket.send(JSON.stringify({
+                        type: 'conversation.chunk_end',
+                        taskId,
+                        groupId,
+                    } as ConversationWsMessage));
+
+                    // Only save design if there's actual content
+                    if (currentTextContent.trim().length > 0) {
+                        // Save design to project directory (not worktree) so it persists after merge
+                        const designsDir = path.join(project.path, '.antiwarden', 'designs');
+                        await fs.mkdir(designsDir, { recursive: true });
+                        const designFileName = `${task.id}-design.md`;
+                        const designPath = path.join(designsDir, designFileName);
+                        await fs.writeFile(designPath, currentTextContent, 'utf-8');
+
+                        // Store designPath relative to project directory
+                        task.designPath = `.antiwarden/designs/${designFileName}`;
+
+                        // Update task status and move to develop lane
+                        task.status = 'idle';
+                        task.laneId = 'develop';
+                        task.updatedAt = new Date().toISOString();
+                        await writeProjectData(project.path, data);
+
+                        // Send status update notification to frontend
+                        if (connection.socket.readyState === 1) {
+                            connection.socket.send(JSON.stringify({
+                                type: 'task_status',
+                                taskId: taskId,
+                                status: 'idle',
+                                laneId: 'develop'
+                            }));
+                        }
+
+                        // Add completion system message
+                        const completeMessage: ConversationMessage = {
+                            id: uuid(),
+                            role: 'system',
+                            content: `[系统] 设计方案已生成并保存到: ${task.designPath}，任务已移至开发泳道`,
+                            type: 'info',
+                            timestamp: new Date().toISOString(),
+                        };
+                        await sendAndSaveMessage(connection, taskId, project.path, completeMessage);
+
+                        connection.socket.send(JSON.stringify({
+                            type: 'conversation.design_complete',
+                            taskId,
+                            designPath: task.designPath,
+                            content: completeMessage.content,
+                        } as ConversationWsMessage));
+
+                        // Also send structured-output if design contains structured data
+                        const structuredOutput = parseDesignToStructuredOutput(currentTextContent, task);
+                        if (structuredOutput) {
+                            task.structuredOutput = structuredOutput;
+                            await writeProjectData(project.path, data);
+                            connection.socket.send(JSON.stringify({
+                                type: 'structured-output',
+                                taskId,
+                                output: structuredOutput,
+                            }));
+                        }
+
+                        console.log('[Execution] Design saved, task updated, conversation persisted');
+                    } else {
+                        // No content generated - mark as failed
+                        task.status = 'failed';
+                        task.updatedAt = new Date().toISOString();
+                        await writeProjectData(project.path, data);
+
+                        const errorMsg: ConversationMessage = {
+                            id: uuid(),
+                            role: 'system',
+                            content: '错误: 未生成任何设计方案内容',
+                            type: 'error',
+                            timestamp: new Date().toISOString(),
+                        };
+                        await sendAndSaveMessage(connection, taskId, projectPath, errorMsg);
+                    }
+                }
             }
         }
     } catch (error: any) {
@@ -1050,6 +1153,11 @@ async function handleLaneExecutionWithAgent(
     await writeProjectData(project.path, data);
     console.log(`[Execution] ${laneType} task ${taskId} status set to running`);
 
+    // Register this execution for stop functionality
+    const executionContext = { stopped: false, connection };
+    runningLaneExecutions.set(taskId, executionContext);
+    console.log(`[Execution] Registered lane execution for task: ${taskId}`);
+
     // Send status update notification to frontend
     if (connection.socket.readyState === 1) {
         connection.socket.send(JSON.stringify({
@@ -1085,20 +1193,32 @@ async function handleLaneExecutionWithAgent(
     await sendAndSaveMessage(connection, taskId, projectPath, systemMessage);
 
     // Build prompt
-    const userPrompt = task.prompt || `## 任务\n\n**标题**: ${task.title}\n\n**描述**:\n${task.description}`;
+    // For develop/test lanes: only use lane prompt + design doc reference (no user task description)
+    // For design lane: use lane prompt + user prompt
     const config = await readGlobalConfig();
     const lanePrompt = getLanePrompt(task.laneId, data, config.settings.lanePrompts || {});
 
-    // Add design doc reference if available
-    let fullPrompt = userPrompt;
-    if (task.designPath) {
-        fullPrompt = `请按照 @${task.designPath} 中的设计方案继续执行任务。\n\n${userPrompt}`;
+    let prompt: string;
+    if (task.laneId === 'develop' || task.laneId === 'test') {
+        // Develop/Test lanes: only lane prompt + design doc
+        if (task.designPath) {
+            // Design file is in project directory, need to reference from worktree
+            // worktree path: {projectPath}/.worktrees/{taskId}
+            // design file: {projectPath}/.antiwarden/designs/{taskId}-design.md
+            // relative path from worktree: ../../.antiwarden/designs/{taskId}-design.md
+            const designFileName = task.designPath.split('/').pop(); // Get {taskId}-design.md
+            const relativeDesignPath = `../../.antiwarden/designs/${designFileName}`;
+            prompt = `${lanePrompt}\n\n请按照 @${relativeDesignPath} 中的设计方案执行任务。`;
+        } else {
+            prompt = lanePrompt || '请继续执行任务。';
+        }
+    } else {
+        // Design lane: lane prompt + user prompt
+        const userPrompt = task.prompt || `## 任务\n\n**标题**: ${task.title}\n\n**描述**:\n${task.description}`;
+        prompt = lanePrompt
+            ? `${lanePrompt}\n\n---\n\n${userPrompt}`
+            : userPrompt;
     }
-
-    // Combine with lane prompt
-    const prompt = lanePrompt
-        ? `${lanePrompt}\n\n---\n\n${fullPrompt}`
-        : fullPrompt;
 
     // Get output format for this lane
     const outputFormat = getSchemaForLane(task.laneId);
@@ -1143,6 +1263,12 @@ async function handleLaneExecutionWithAgent(
             prompt,
             options: queryOptions,
         })) {
+            // Check if execution was stopped
+            if (executionContext.stopped) {
+                console.log(`[Execution] ${laneName} execution was stopped, breaking loop`);
+                break;
+            }
+
             console.log(`[Execution] ${laneName} message type:`, sdkMessage.type);
 
             // Track session ID
@@ -1376,6 +1502,32 @@ async function handleLaneExecutionWithAgent(
                     pendingToolCalls.clear();
                 }
 
+                // Also update any pending tool calls in the conversation storage
+                // This ensures all tools are marked as complete even if tracking was missed
+                try {
+                    const conversation = await conversationStorage.load(project.path, taskId);
+                    if (conversation) {
+                        let updated = false;
+                        for (const msg of conversation.messages) {
+                            if (msg.role === 'assistant' && (msg as any).toolCall) {
+                                const toolCall = (msg as any).toolCall as ToolCall;
+                                if (toolCall.status === 'pending') {
+                                    console.log(`[Execution] Updating pending tool in storage:`, toolCall.name);
+                                    toolCall.status = 'success';
+                                    toolCall.output = toolCall.output || 'Tool executed';
+                                    updated = true;
+                                }
+                            }
+                        }
+                        if (updated) {
+                            await conversationStorage.save(project.path, conversation);
+                            console.log(`[Execution] Saved updated conversation with completed tool statuses`);
+                        }
+                    }
+                } catch (err) {
+                    console.error('[Execution] Failed to update pending tools in conversation:', err);
+                }
+
                 // Check for structured output
                 if ((sdkMessage as any).structured_output) {
                     console.log(`[Execution] Structured output received`);
@@ -1400,9 +1552,11 @@ async function handleLaneExecutionWithAgent(
                 task.status = 'idle';
                 task.updatedAt = new Date().toISOString();
 
-                // Auto-move from develop to test lane
+                // Auto-move through lanes: develop -> test -> pending-merge
                 if (task.laneId === 'develop') {
                     task.laneId = 'test';
+                } else if (task.laneId === 'test') {
+                    task.laneId = 'pending-merge';
                 }
 
                 await writeProjectData(project.path, data);
@@ -1472,6 +1626,10 @@ async function handleLaneExecutionWithAgent(
             taskId,
             error: error.message,
         } as ConversationWsMessage));
+    } finally {
+        // Always clear the execution tracking when done
+        runningLaneExecutions.delete(taskId);
+        console.log(`[Execution] Cleared lane execution tracking for task: ${taskId}`);
     }
 }
 
