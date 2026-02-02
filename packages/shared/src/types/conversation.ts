@@ -10,35 +10,52 @@ export interface Conversation {
     messages: ConversationMessage[];
 }
 
+/**
+ * Each message is a discrete unit that gets rendered in sequence
+ * - User messages contain user's input
+ * - System messages are info/warning/error
+ * - Assistant messages are broken into blocks (text, thinking, tool_call) that appear in order
+ */
 export type ConversationMessage =
     | UserMessage
     | AssistantMessage
     | SystemMessage;
 
-export interface UserMessage {
+export interface BaseMessage {
     id: string;
+    role: 'user' | 'assistant' | 'system';
+    timestamp: string;
+}
+
+export interface UserMessage extends BaseMessage {
     role: 'user';
     content: string;
-    timestamp: string;
     metadata?: MessageMetadata;
 }
 
-export interface AssistantMessage {
-    id: string;
+/**
+ * Assistant messages represent one "chunk" of output
+ * Could be text content, thinking, or a tool call
+ */
+export interface AssistantMessage extends BaseMessage {
     role: 'assistant';
-    content: string;
-    timestamp: string;
-    thinking?: string;
-    toolCalls?: ToolCall[];
-    status: MessageStatus;
+
+    // Exactly one of these should be set
+    content?: string;          // Plain text content
+    thinking?: string;        // Thinking process
+    toolCall?: ToolCall;      // Tool invocation
+
+    // Status for streaming
+    status?: MessageStatus;
+
+    // Group ID to link multiple assistant messages together
+    groupId?: string;
 }
 
-export interface SystemMessage {
-    id: string;
+export interface SystemMessage extends BaseMessage {
     role: 'system';
     content: string;
     type: SystemMessageType;
-    timestamp: string;
 }
 
 export type MessageStatus = 'streaming' | 'complete' | 'error';
@@ -67,26 +84,28 @@ export interface Attachment {
 
 // WebSocket message types for conversation
 export interface ConversationWsMessage {
-    type: 'conversation.user_input' | 'conversation.execute_start' | 'conversation.design_start' | 'conversation.chunk_start' | 'conversation.chunk' |
-           'conversation.chunk_end' | 'conversation.thinking_start' | 'conversation.thinking_end' |
-           'conversation.tool_call' | 'conversation.error' | 'conversation.design_complete' | 'conversation.execute_complete' |
-           'structured-output';
+    type: 'conversation.user_input' | 'conversation.execute_start' | 'conversation.design_start' |
+           'conversation.chunk_start' | 'conversation.chunk' | 'conversation.chunk_end' |
+           'conversation.thinking' | 'conversation.tool_call_start' | 'conversation.tool_call_output' |
+           'conversation.tool_call_end' | 'conversation.error' | 'conversation.design_complete' |
+           'conversation.execute_complete' | 'structured-output';
     taskId: string;
     projectId?: string;
     messageId?: string;
+    groupId?: string;  // Group multiple assistant messages together
     content?: string;
     toolCall?: ToolCall;
     error?: string;
-    designPath?: string;  // For design_complete
-    structuredOutput?: unknown;  // For execute_complete or structured-output
-    output?: unknown;  // For structured-output
+    designPath?: string;
+    structuredOutput?: unknown;
+    output?: unknown;
 }
 
 // Slash command definitions
 export interface SlashCommand {
     command: string;
     description: string;
-    handler: string; // Backend handler name
+    handler: string;
 }
 
 export const SLASH_COMMANDS: SlashCommand[] = [

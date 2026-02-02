@@ -1,8 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { v4 as uuid } from 'uuid';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { readGlobalConfig, readProjectData, writeProjectData } from '../utils/json-store';
 import { worktreeManager } from '../services/worktree-manager';
 import type { Task } from '@antiwarden/shared';
+
+const execAsync = promisify(exec);
 
 export async function taskRoutes(fastify: FastifyInstance) {
     // Create task
@@ -95,6 +99,27 @@ export async function taskRoutes(fastify: FastifyInstance) {
         if (!project) throw { statusCode: 404, message: 'Project not found' };
 
         const data = await readProjectData(project.path);
+        const task = data.tasks.find(t => t.id === request.params.taskId);
+
+        // Delete worktree if exists
+        if (task?.worktree) {
+            try {
+                console.log(`[Tasks] Removing worktree for task ${request.params.taskId}:`, task.worktree.path);
+                await worktreeManager.removeWorktree(project.path, task.worktree.path);
+
+                // Also delete the branch
+                try {
+                    await execAsync(`git branch -D "${task.worktree.branch}"`, { cwd: project.path });
+                    console.log(`[Tasks] Deleted branch: ${task.worktree.branch}`);
+                } catch (branchError: any) {
+                    console.log(`[Tasks] Could not delete branch (may not exist): ${branchError.message}`);
+                }
+            } catch (error: any) {
+                console.error(`[Tasks] Failed to remove worktree:`, error);
+                // Continue with task deletion even if worktree removal fails
+            }
+        }
+
         data.tasks = data.tasks.filter(t => t.id !== request.params.taskId);
         await writeProjectData(project.path, data);
         return { success: true };

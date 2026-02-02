@@ -18,6 +18,7 @@ interface AppState {
     openSidebar: () => void;
     closeSidebar: () => void;
     updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
+    syncTaskUpdate: (taskId: string, updates: Partial<Task>) => void;
     removeTask: (taskId: string) => Promise<void>;
     addTask: (task: Task) => void;
     moveTask: (taskId: string, targetLaneId: string, newIndex: number) => Promise<void>;
@@ -62,6 +63,21 @@ export const useAppStore = create<AppState>((set, get) => ({
             console.error('Failed to update task:', error);
             // Revert needed in real app
         }
+    },
+
+    // Sync task update from WebSocket (no API call, just local update)
+    syncTaskUpdate: (taskId, updates) => {
+        set((s) => {
+            if (!s.projectData) return s;
+            return {
+                projectData: {
+                    ...s.projectData,
+                    tasks: s.projectData.tasks.map((task) =>
+                        task.id === taskId ? { ...task, ...updates, updatedAt: new Date().toISOString() } : task
+                    ),
+                },
+            };
+        });
     },
 
     removeTask: async (taskId) => {

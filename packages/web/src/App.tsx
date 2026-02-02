@@ -11,6 +11,7 @@ import { DEFAULT_LANES } from '@antiwarden/shared';
 import type { Task } from '@antiwarden/shared';
 import type { ProjectRef } from './api/projects';
 import { fetchProjectData, createTask } from './api/projects';
+import { connectionManager } from './services/ConnectionManager';
 import './index.css';
 
 function App() {
@@ -25,11 +26,25 @@ function App() {
     setProjectData,
     addTask,
     moveTask,
+    syncTaskUpdate,
   } = useAppStore();
 
   const [loading, setLoading] = useState(false);
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Listen to global WebSocket messages for status updates
+  useEffect(() => {
+    const unsubscribe = connectionManager.subscribe('*', (message) => {
+      if (message.type === 'task_status' && message.taskId) {
+        syncTaskUpdate(message.taskId, {
+          status: message.status as Task['status'],
+          laneId: message.laneId,
+        });
+      }
+    });
+    return unsubscribe;
+  }, [syncTaskUpdate]);
 
   // Load project data when a project is selected
   useEffect(() => {

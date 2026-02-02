@@ -21,6 +21,9 @@ export interface WsMessage {
     messageId?: string;
     toolCall?: any;
     error?: string;
+    // Task status update fields
+    status?: string;
+    laneId?: string;
 }
 
 type MessageHandler = (message: WsMessage) => void;

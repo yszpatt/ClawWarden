@@ -2,6 +2,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join, basename } from 'path';
 import { existsSync, rmSync } from 'fs';
+import { conversationStorage } from './conversation-storage';
 
 const execAsync = promisify(exec);
 
@@ -173,12 +174,26 @@ export class WorktreeManager {
 
     /**
      * Remove a worktree
+     * Also deletes the associated session file
      */
     async removeWorktree(projectPath: string, worktreePath: string): Promise<void> {
+        // Extract taskId from worktreePath (format: {projectPath}/.worktrees/{taskId})
+        const taskId = basename(worktreePath);
+
+        // Remove the git worktree
         if (existsSync(worktreePath)) {
             await execAsync(`git worktree remove "${worktreePath}" --force`, {
                 cwd: projectPath,
             });
+            console.log(`[WorktreeManager] Removed worktree: ${worktreePath}`);
+        }
+
+        // Delete the associated session file
+        try {
+            await conversationStorage.delete(projectPath, taskId);
+            console.log(`[WorktreeManager] Deleted session file for task: ${taskId}`);
+        } catch (error) {
+            console.log(`[WorktreeManager] Could not delete session file (may not exist): ${error}`);
         }
     }
 

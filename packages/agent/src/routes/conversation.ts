@@ -16,7 +16,7 @@ export async function conversationRoutes(fastify: FastifyInstance) {
             throw { statusCode: 404, message: 'Project not found' };
         }
 
-        const conversation = await conversationStorage.load(taskId);
+        const conversation = await conversationStorage.load(project.path, taskId);
         return { conversation };
     });
 
@@ -34,7 +34,7 @@ export async function conversationRoutes(fastify: FastifyInstance) {
             throw { statusCode: 404, message: 'Project not found' };
         }
 
-        await conversationStorage.appendMessage(taskId, message);
+        await conversationStorage.appendMessage(project.path, taskId, message);
         return { success: true };
     });
 
@@ -50,7 +50,7 @@ export async function conversationRoutes(fastify: FastifyInstance) {
             throw { statusCode: 404, message: 'Project not found' };
         }
 
-        await conversationStorage.clear(taskId);
+        await conversationStorage.clear(project.path, taskId);
         return { success: true };
     });
 
@@ -66,7 +66,7 @@ export async function conversationRoutes(fastify: FastifyInstance) {
             throw { statusCode: 404, message: 'Project not found' };
         }
 
-        const conversation = await conversationStorage.load(taskId);
+        const conversation = await conversationStorage.load(project.path, taskId);
         if (!conversation) {
             throw { statusCode: 404, message: 'Conversation not found' };
         }

@@ -509,6 +509,8 @@ export class AgentManager extends EventEmitter {
             session.queryInstance.close();
             session.completed = true;
             console.log(`[AgentManager] Marked task ${taskId} session as completed (stopped), keeping output buffer`);
+            // Emit status update to change running -> idle
+            this.emit('statusUpdate', { taskId, status: 'idle' });
         }
     }
 

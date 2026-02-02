@@ -9,8 +9,74 @@ import { agentManager } from '../services/agent-manager';
 import { worktreeManager } from '../services/worktree-manager';
 import { conversationStorage } from '../services/conversation-storage';
 import { getSchemaForLane, getOutputTypeForLane } from '../services/schemas';
-import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task, ToolCall } from '@antiwarden/shared';
+import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task, ToolCall, AssistantMessage } from '@antiwarden/shared';
 import { getLanePrompt } from '@antiwarden/shared';
+
+/**
+ * Send a WebSocket message and immediately save to conversation storage
+ */
+async function sendAndSaveMessage(
+    connection: SocketStream,
+    taskId: string,
+    projectPath: string,
+    message: ConversationMessage
+): Promise<void> {
+    // Send via WebSocket based on message type
+    const wsMessage: ConversationWsMessage = { taskId } as ConversationWsMessage;
+
+    if (message.role === 'system') {
+        wsMessage.type = 'conversation.chunk';
+        wsMessage.messageId = message.id;
+        wsMessage.content = (message as any).content;
+    } else if (message.role === 'assistant') {
+        const assistantMsg = message as AssistantMessage;
+
+        if (assistantMsg.content) {
+            wsMessage.type = 'conversation.chunk';
+            wsMessage.messageId = message.id;
+            wsMessage.content = assistantMsg.content;
+            wsMessage.groupId = assistantMsg.groupId;
+        } else if (assistantMsg.thinking) {
+            wsMessage.type = 'conversation.thinking';
+            wsMessage.groupId = assistantMsg.groupId;
+            wsMessage.content = assistantMsg.thinking;
+        } else if (assistantMsg.toolCall) {
+            const tool = assistantMsg.toolCall;
+            if (tool.status === 'pending') {
+                wsMessage.type = 'conversation.tool_call_start';
+                wsMessage.groupId = assistantMsg.groupId;
+                wsMessage.toolCall = tool;
+            } else if (tool.output) {
+                wsMessage.type = 'conversation.tool_call_output';
+                wsMessage.groupId = assistantMsg.groupId;
+                wsMessage.toolCall = tool;
+            } else {
+                wsMessage.type = 'conversation.tool_call_end';
+                wsMessage.groupId = assistantMsg.groupId;
+                wsMessage.toolCall = tool;
+            }
+        }
+    }
+
+    connection.socket.send(JSON.stringify(wsMessage));
+
+    // Immediately save to conversation storage
+    await conversationStorage.appendMessage(projectPath, taskId, message);
+}
+
+/**
+ * Create a new message group with a unique groupId
+ */
+function createMessageGroup(): { groupId: string; chunkStartMsg: ConversationWsMessage } {
+    const groupId = `group-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    return {
+        groupId,
+        chunkStartMsg: {
+            type: 'conversation.chunk_start',
+            groupId,
+        } as ConversationWsMessage,
+    };
+}
 
 /**
  * Helper function to update task status across all projects
@@ -130,20 +196,48 @@ export async function executionHandler(fastify: FastifyInstance) {
             }
         };
 
-        const statusUpdateListener = (event: { taskId: string, status: TaskStatus, moveTo?: string }) => {
-            if (currentTaskId && event.taskId === currentTaskId) {
-                // Update DB
-                updateTaskStatus(event.taskId, event.status, event.moveTo).catch(console.error);
-
-                // Determine if we need to send exit/completed to client?
-                if (event.status === 'completed' || event.status === 'failed') {
-                    if (connection.socket.readyState === 1) {
-                        connection.socket.send(JSON.stringify({
-                            type: 'exit',
-                            taskId: event.taskId,
-                            exitCode: event.status === 'completed' ? 0 : 1
-                        }));
+        const statusUpdateListener = async (event: { taskId: string, status: TaskStatus, moveTo?: string }) => {
+            // Auto-lane movement: when task completes, move to next lane
+            let targetLane = event.moveTo;
+            if (!targetLane && event.status === 'completed') {
+                // Find current task's lane
+                const config = await readGlobalConfig();
+                for (const proj of config.projects) {
+                    const data = await readProjectData(proj.path);
+                    const task = data.tasks.find(t => t.id === event.taskId);
+                    if (task) {
+                        // Auto-move based on current lane
+                        if (task.laneId === 'develop') {
+                            targetLane = 'test';
+                        } else if (task.laneId === 'test') {
+                            targetLane = 'pending-merge';
+                        }
+                        break;
                     }
+                }
+            }
+
+            // Update DB
+            await updateTaskStatus(event.taskId, event.status, targetLane);
+
+            // Send status update notification to frontend
+            if (connection.socket.readyState === 1) {
+                connection.socket.send(JSON.stringify({
+                    type: 'task_status',
+                    taskId: event.taskId,
+                    status: event.status,
+                    laneId: targetLane
+                }));
+            }
+
+            // Determine if we need to send exit/completed to client?
+            if (event.status === 'completed' || event.status === 'failed') {
+                if (connection.socket.readyState === 1) {
+                    connection.socket.send(JSON.stringify({
+                        type: 'exit',
+                        taskId: event.taskId,
+                        exitCode: event.status === 'completed' ? 0 : 1
+                    }));
                 }
             }
         };
@@ -428,7 +522,7 @@ async function handleConversationUserMessage(
             command: content.startsWith('/') ? content.split(' ')[0] : undefined,
         },
     };
-    await conversationStorage.appendMessage(taskId, userMessage);
+    await conversationStorage.appendMessage(project.path, taskId, userMessage);
 
     // Create assistant message placeholder
     const assistantMessageId = uuid();
@@ -438,9 +532,8 @@ async function handleConversationUserMessage(
         content: '',
         timestamp: new Date().toISOString(),
         status: 'streaming',
-        toolCalls: [],
     };
-    await conversationStorage.appendMessage(taskId, assistantMessage);
+    await conversationStorage.appendMessage(project.path, taskId, assistantMessage);
 
     // Send chunk_start
     connection.socket.send(JSON.stringify({
@@ -500,7 +593,7 @@ async function handleConversationUserMessage(
         onConversationThinkingStart: async (thinkingContent: string) => {
             console.log('[Execution] onConversationThinkingStart');
             connection.socket.send(JSON.stringify({
-                type: 'conversation.thinking_start',
+                type: 'conversation.thinking',
                 taskId,
                 content: thinkingContent,
             } as ConversationWsMessage));
@@ -508,10 +601,7 @@ async function handleConversationUserMessage(
 
         onConversationThinkingEnd: async () => {
             console.log('[Execution] onConversationThinkingEnd');
-            connection.socket.send(JSON.stringify({
-                type: 'conversation.thinking_end',
-                taskId,
-            } as ConversationWsMessage));
+            // Thinking end is handled by frontend receiving the thinking content
         },
 
         onConversationToolCall: async (toolCall: any) => {
@@ -520,11 +610,12 @@ async function handleConversationUserMessage(
             toolCallsMap.set(key, toolCall);
             console.log('[Execution] onConversationToolCall:', toolCall.name);
 
+            // Send tool_call_start message
             connection.socket.send(JSON.stringify({
-                type: 'conversation.tool_call',
+                type: 'conversation.tool_call_start',
                 taskId,
                 toolCall,
-            } as ConversationWsMessage));
+            } as unknown as ConversationWsMessage));
         },
 
         onConversationComplete: async (msgId: string) => {
@@ -536,17 +627,14 @@ async function handleConversationUserMessage(
             } as ConversationWsMessage));
 
             // Mark message as complete and save final state
-            const conversation = await conversationStorage.load(taskId);
+            const conversation = await conversationStorage.load(project.path, taskId);
             if (conversation) {
                 const msg = conversation.messages.find((m: any) => m.id === assistantMessageId);
                 if (msg && msg.role === 'assistant') {
                     (msg as any).status = 'complete';
                     msg.content = accumulatedContent;
-                    if (toolCallsMap.size > 0) {
-                        (msg as any).toolCalls = Array.from(toolCallsMap.values());
-                    }
                 }
-                await conversationStorage.save(taskId, conversation);
+                await conversationStorage.save(project.path, conversation);
             }
         },
     };
@@ -572,7 +660,7 @@ async function handleConversationUserMessage(
 
 /**
  * Handle design generation through conversation panel
- * Streams the design process in the conversation
+ * Streams the design process with immediate saving
  */
 async function handleConversationDesignStart(
     connection: SocketStream,
@@ -592,11 +680,28 @@ async function handleConversationDesignStart(
     }
 
     const { project, task, data } = result;
+    const projectPath = project.path;
     const workingDir = task.worktree?.path || project.path;
     const sessionId = task.claudeSession?.id;
 
-    // Get or create conversation
-    let conversation = await conversationStorage.load(taskId);
+    // Update task status to running
+    task.status = 'running';
+    task.updatedAt = new Date().toISOString();
+    await writeProjectData(project.path, data);
+    console.log(`[Execution] Design task ${taskId} status set to running`);
+
+    // Send status update notification to frontend
+    if (connection.socket.readyState === 1) {
+        connection.socket.send(JSON.stringify({
+            type: 'task_status',
+            taskId: taskId,
+            status: 'running',
+            laneId: task.laneId
+        }));
+    }
+
+    // Initialize conversation if needed
+    let conversation = await conversationStorage.load(project.path, taskId);
     if (!conversation) {
         conversation = {
             taskId,
@@ -604,87 +709,50 @@ async function handleConversationDesignStart(
             updatedAt: new Date().toISOString(),
             messages: [],
         };
+        await conversationStorage.save(project.path, conversation);
     }
 
-    // Create and save system message indicating design is starting
-    const systemMessageId = uuid();
+    // Send system message indicating design is starting
     const systemMessage: ConversationMessage = {
-        id: systemMessageId,
+        id: uuid(),
         role: 'system',
         content: '[系统] 正在生成设计方案...',
         type: 'info',
         timestamp: new Date().toISOString(),
     };
-    conversation.messages.push(systemMessage);
-    await conversationStorage.save(taskId, conversation);
-
-    // Send system message via WebSocket
-    connection.socket.send(JSON.stringify({
-        type: 'conversation.chunk_start',
-        taskId,
-        messageId: systemMessageId,
-        content: '',
-    } as ConversationWsMessage));
-
-    connection.socket.send(JSON.stringify({
-        type: 'conversation.chunk',
-        taskId,
-        messageId: systemMessageId,
-        content: systemMessage.content + '\n',
-    } as ConversationWsMessage));
-
-    connection.socket.send(JSON.stringify({
-        type: 'conversation.chunk_end',
-        taskId,
-        messageId: systemMessageId,
-    } as ConversationWsMessage));
-
-    // Create assistant message placeholder for the design response
-    const assistantMessageId = uuid();
-    const assistantMessage: ConversationMessage = {
-        id: assistantMessageId,
-        role: 'assistant',
-        content: '',
-        timestamp: new Date().toISOString(),
-        status: 'streaming',
-    };
-    conversation.messages.push(assistantMessage);
-    await conversationStorage.save(taskId, conversation);
-
-    connection.socket.send(JSON.stringify({
-        type: 'conversation.chunk_start',
-        taskId,
-        messageId: assistantMessageId,
-    } as ConversationWsMessage));
-
-    let designContent = '';
+    await sendAndSaveMessage(connection, taskId, projectPath, systemMessage);
 
     // Build user prompt from task data
-    // Use task.prompt as the primary user prompt, fallback to title + description
     const userPrompt = task.prompt || `## 任务需求\n\n**标题**: ${task.title}\n\n**描述**:\n${task.description}`;
 
     const config = await readGlobalConfig();
-    // Use lane prompt as system prompt (configured in settings)
     const lanePrompt = getLanePrompt('design', data, config.settings.lanePrompts || {});
 
-    // Debug: log lane configuration
     console.log('[Execution] Lane config:', {
         laneId: 'design',
         projectLanes: data.lanes.map((l: any) => ({ id: l.id, name: l.name, hasSystemPrompt: !!l.systemPrompt })),
         globalLanePrompts: Object.keys(config.settings.lanePrompts || {}),
         lanePromptLength: lanePrompt.length,
-        lanePromptPreview: lanePrompt ? lanePrompt.slice(0, 100) : '(empty)',
     });
 
-    // Combine system prompt with user prompt (same approach as agentManager.generateDesign)
+    // Combine system prompt with user prompt
     const prompt = lanePrompt
         ? `${lanePrompt}\n\n---\n\n${userPrompt}`
         : userPrompt;
 
     console.log('[Execution] Starting design generation with streaming, sessionId:', sessionId);
-    console.log('[Execution] Lane prompt length:', lanePrompt.length, 'User prompt length:', userPrompt.length, 'Final prompt length:', prompt.length);
+    console.log('[Execution] Lane prompt length:', lanePrompt.length, 'User prompt length:', userPrompt.length);
 
-    // Use query() for streaming design, maintaining session continuity
+    // Create message group for this response
+    const { groupId, chunkStartMsg } = createMessageGroup();
+    chunkStartMsg.taskId = taskId;
+    connection.socket.send(JSON.stringify(chunkStartMsg));
+
+    // Track current text content for streaming
+    let currentContentMsgId: string | null = null;
+    let currentTextContent = '';
+
+    // Use query() for streaming design
     try {
         for await (const sdkMessage of query({
             prompt,
@@ -692,7 +760,7 @@ async function handleConversationDesignStart(
                 allowedTools: ['Read', 'Glob', 'Grep'],
                 settingSources: ['project'],
                 cwd: workingDir,
-                resume: sessionId,  // Resume existing session to maintain conversation context
+                resume: sessionId,
             },
         })) {
             console.log('[Execution] Design message type:', sdkMessage.type);
@@ -715,32 +783,26 @@ async function handleConversationDesignStart(
                 const event = (sdkMessage as any).event;
 
                 if (event?.type === 'content_block_start' && event.block?.type === 'text') {
-                    connection.socket.send(JSON.stringify({
-                        type: 'conversation.chunk',
-                        taskId,
-                        messageId: assistantMessageId,
-                        content: '',
-                    } as ConversationWsMessage));
+                    // Create new content message
+                    currentContentMsgId = uuid();
+                    currentTextContent = '';
                 } else if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
                     const delta = event.delta.text || '';
-                    designContent += delta;
-                    connection.socket.send(JSON.stringify({
-                        type: 'conversation.chunk',
-                        taskId,
-                        messageId: assistantMessageId,
+                    currentTextContent += delta;
+
+                    // Send chunk and save immediately
+                    const contentMsg: ConversationMessage = {
+                        id: currentContentMsgId || uuid(),
+                        role: 'assistant',
                         content: delta,
-                    } as ConversationWsMessage));
+                        groupId,
+                        timestamp: new Date().toISOString(),
+                        status: 'streaming',
+                    };
+                    await sendAndSaveMessage(connection, taskId, projectPath, contentMsg);
                 } else if (event?.type === 'content_block_stop') {
-                    // Block completed, update conversation storage
-                    const conv = await conversationStorage.load(taskId);
-                    if (conv) {
-                        const msg = conv.messages.find((m: any) => m.id === assistantMessageId);
-                        if (msg && msg.role === 'assistant') {
-                            (msg as any).content = designContent;
-                            (msg as any).status = 'streaming';
-                            await conversationStorage.save(taskId, conv);
-                        }
-                    }
+                    currentContentMsgId = null;
+                    currentTextContent = '';
                 }
             }
 
@@ -749,14 +811,18 @@ async function handleConversationDesignStart(
                 const content = (sdkMessage as any).message?.content;
                 if (Array.isArray(content)) {
                     for (const block of content) {
-                        if (block.type === 'text') {
-                            designContent += block.text || '';
-                            connection.socket.send(JSON.stringify({
-                                type: 'conversation.chunk',
-                                taskId,
-                                messageId: assistantMessageId,
-                                content: block.text || '',
-                            } as ConversationWsMessage));
+                        if (block.type === 'text' && block.text) {
+                            // Text blocks also come through here for some messages
+                            const contentMsg: ConversationMessage = {
+                                id: uuid(),
+                                role: 'assistant',
+                                content: block.text,
+                                groupId,
+                                timestamp: new Date().toISOString(),
+                                status: 'streaming',
+                            };
+                            await sendAndSaveMessage(connection, taskId, projectPath, contentMsg);
+                            currentTextContent += block.text;
                         }
                     }
                 }
@@ -764,23 +830,13 @@ async function handleConversationDesignStart(
 
             // Handle result
             else if (sdkMessage.type === 'result') {
-                console.log('[Execution] Design generation completed, content length:', designContent.length);
+                console.log('[Execution] Design generation completed, content length:', currentTextContent.length);
 
-                // Mark assistant message as complete
-                const conv = await conversationStorage.load(taskId);
-                if (conv) {
-                    const msg = conv.messages.find((m: any) => m.id === assistantMessageId);
-                    if (msg && msg.role === 'assistant') {
-                        (msg as any).content = designContent;
-                        (msg as any).status = 'complete';
-                        await conversationStorage.save(taskId, conv);
-                    }
-                }
-
+                // Send chunk_end
                 connection.socket.send(JSON.stringify({
                     type: 'conversation.chunk_end',
                     taskId,
-                    messageId: assistantMessageId,
+                    groupId,
                 } as ConversationWsMessage));
 
                 // Save design to file
@@ -788,29 +844,35 @@ async function handleConversationDesignStart(
                 await fs.mkdir(designsDir, { recursive: true });
                 const designFileName = `${task.id}-design.md`;
                 const designPath = path.join(designsDir, designFileName);
-                await fs.writeFile(designPath, designContent, 'utf-8');
+                await fs.writeFile(designPath, currentTextContent, 'utf-8');
 
-                // Update task status
-                task.status = 'pending-dev';
+                // Update task status and move to develop lane
+                task.status = 'idle';
+                task.laneId = 'develop';
                 task.designPath = path.relative(workingDir, designPath);
                 task.updatedAt = new Date().toISOString();
                 await writeProjectData(project.path, data);
 
-                // Add completion system message to conversation
+                // Send status update notification to frontend
+                if (connection.socket.readyState === 1) {
+                    connection.socket.send(JSON.stringify({
+                        type: 'task_status',
+                        taskId: taskId,
+                        status: 'idle',
+                        laneId: 'develop'
+                    }));
+                }
+
+                // Add completion system message
                 const completeMessage: ConversationMessage = {
                     id: uuid(),
                     role: 'system',
-                    content: `[系统] 设计方案已生成并保存到: ${task.designPath}`,
+                    content: `[系统] 设计方案已生成并保存到: ${task.designPath}，任务已移至开发泳道`,
                     type: 'info',
                     timestamp: new Date().toISOString(),
                 };
-                const finalConv = await conversationStorage.load(taskId);
-                if (finalConv) {
-                    finalConv.messages.push(completeMessage);
-                    await conversationStorage.save(taskId, finalConv);
-                }
+                await sendAndSaveMessage(connection, taskId, projectPath, completeMessage);
 
-                // Send design complete message
                 connection.socket.send(JSON.stringify({
                     type: 'conversation.design_complete',
                     taskId,
@@ -819,7 +881,7 @@ async function handleConversationDesignStart(
                 } as ConversationWsMessage));
 
                 // Also send structured-output if design contains structured data
-                const structuredOutput = parseDesignToStructuredOutput(designContent, task);
+                const structuredOutput = parseDesignToStructuredOutput(currentTextContent, task);
                 if (structuredOutput) {
                     task.structuredOutput = structuredOutput;
                     await writeProjectData(project.path, data);
@@ -836,19 +898,24 @@ async function handleConversationDesignStart(
     } catch (error: any) {
         console.error('[Execution] Design generation error:', error);
 
-        // Save error to conversation
-        const conv = await conversationStorage.load(taskId);
-        if (conv) {
-            const errorMessage: ConversationMessage = {
-                id: uuid(),
-                role: 'system',
-                content: `错误: ${error.message}`,
-                type: 'error',
-                timestamp: new Date().toISOString(),
-            };
-            conv.messages.push(errorMessage);
-            await conversationStorage.save(taskId, conv);
+        // Update task status to failed
+        const result = await findTask(taskId);
+        if (result) {
+            result.task.status = 'failed';
+            result.task.updatedAt = new Date().toISOString();
+            await writeProjectData(result.project.path, result.data);
+            console.log(`[Execution] Design task ${taskId} status set to failed`);
         }
+
+        // Save error to conversation
+        const errorMessage: ConversationMessage = {
+            id: uuid(),
+            role: 'system',
+            content: `错误: ${error.message}`,
+            type: 'error',
+            timestamp: new Date().toISOString(),
+        };
+        await sendAndSaveMessage(connection, taskId, projectPath, errorMessage);
 
         connection.socket.send(JSON.stringify({
             type: 'conversation.error',
@@ -939,7 +1006,7 @@ async function handleConversationDefaultExecute(
 
 /**
  * Common handler for develop/test lane execution with streaming
- * Directly uses query() like design lane for consistent behavior
+ * Sends each chunk (text, thinking, tool_call) immediately and saves to file
  */
 async function handleLaneExecutionWithAgent(
     connection: SocketStream,
@@ -960,11 +1027,28 @@ async function handleLaneExecutionWithAgent(
     }
 
     const { project, task, data } = result;
+    const projectPath = project.path;
     const workingDir = task.worktree?.path || project.path;
     const sessionId = task.claudeSession?.id;
 
-    // Get or create conversation
-    let conversation = await conversationStorage.load(taskId);
+    // Update task status to running
+    task.status = 'running';
+    task.updatedAt = new Date().toISOString();
+    await writeProjectData(project.path, data);
+    console.log(`[Execution] ${laneType} task ${taskId} status set to running`);
+
+    // Send status update notification to frontend
+    if (connection.socket.readyState === 1) {
+        connection.socket.send(JSON.stringify({
+            type: 'task_status',
+            taskId: taskId,
+            status: 'running',
+            laneId: task.laneId
+        }));
+    }
+
+    // Initialize conversation if needed
+    let conversation = await conversationStorage.load(project.path, taskId);
     if (!conversation) {
         conversation = {
             taskId,
@@ -972,59 +1056,20 @@ async function handleLaneExecutionWithAgent(
             updatedAt: new Date().toISOString(),
             messages: [],
         };
+        await conversationStorage.save(project.path, conversation);
     }
 
     const laneName = laneType === 'develop' ? '开发' : laneType === 'test' ? '测试' : '执行';
-    const systemMessageId = uuid();
+
+    // Send system message indicating task start
     const systemMessage: ConversationMessage = {
-        id: systemMessageId,
+        id: uuid(),
         role: 'system',
         content: `[系统] 开始${laneName}任务...`,
         type: 'info',
         timestamp: new Date().toISOString(),
     };
-    conversation.messages.push(systemMessage);
-    await conversationStorage.save(taskId, conversation);
-
-    // Send system message via WebSocket
-    connection.socket.send(JSON.stringify({
-        type: 'conversation.chunk_start',
-        taskId,
-        messageId: systemMessageId,
-        content: '',
-    } as ConversationWsMessage));
-
-    connection.socket.send(JSON.stringify({
-        type: 'conversation.chunk',
-        taskId,
-        messageId: systemMessageId,
-        content: systemMessage.content + '\n',
-    } as ConversationWsMessage));
-
-    connection.socket.send(JSON.stringify({
-        type: 'conversation.chunk_end',
-        taskId,
-        messageId: systemMessageId,
-    } as ConversationWsMessage));
-
-    // Create assistant message placeholder
-    const assistantMessageId = uuid();
-    const assistantMessage: ConversationMessage = {
-        id: assistantMessageId,
-        role: 'assistant',
-        content: '',
-        timestamp: new Date().toISOString(),
-        status: 'streaming',
-        toolCalls: [],
-    };
-    conversation.messages.push(assistantMessage);
-    await conversationStorage.save(taskId, conversation);
-
-    connection.socket.send(JSON.stringify({
-        type: 'conversation.chunk_start',
-        taskId,
-        messageId: assistantMessageId,
-    } as ConversationWsMessage));
+    await sendAndSaveMessage(connection, taskId, projectPath, systemMessage);
 
     // Build prompt
     const userPrompt = task.prompt || `## 任务\n\n**标题**: ${task.title}\n\n**描述**:\n${task.description}`;
@@ -1041,10 +1086,6 @@ async function handleLaneExecutionWithAgent(
     const prompt = lanePrompt
         ? `${lanePrompt}\n\n---\n\n${fullPrompt}`
         : fullPrompt;
-
-    // Track accumulated content and tool calls
-    let accumulatedContent = '';
-    const toolCallsMap = new Map<string, any>();
 
     // Get output format for this lane
     const outputFormat = getSchemaForLane(task.laneId);
@@ -1065,7 +1106,7 @@ async function handleLaneExecutionWithAgent(
         settingSources: ['project'],
         cwd: workingDir,
         resume: sessionId,
-        permissionMode: 'default',  // Auto-approve tool permissions
+        permissionMode: 'default',
     };
 
     // Add output format if provided
@@ -1073,7 +1114,17 @@ async function handleLaneExecutionWithAgent(
         (queryOptions as any).outputFormat = outputFormat;
     }
 
-    // Use query() for streaming, consistent with design lane
+    // Create message group for this response
+    const { groupId, chunkStartMsg } = createMessageGroup();
+    chunkStartMsg.taskId = taskId;
+    connection.socket.send(JSON.stringify(chunkStartMsg));
+
+    // Track current text content for streaming (we update the same content message)
+    let currentContentMsgId: string | null = null;
+    let currentTextContent = '';
+    const pendingToolCalls = new Map<string, { name: string; input: unknown; msgId: string }>();
+
+    // Use query() for streaming
     try {
         for await (const sdkMessage of query({
             prompt,
@@ -1101,35 +1152,28 @@ async function handleLaneExecutionWithAgent(
                 // Text content streaming
                 if (event?.type === 'content_block_start' && event.block?.type === 'text') {
                     console.log(`[Execution] content_block_start`);
-                    // Send empty chunk to signal start
-                    connection.socket.send(JSON.stringify({
-                        type: 'conversation.chunk',
-                        taskId,
-                        messageId: assistantMessageId,
-                        content: '',
-                    } as ConversationWsMessage));
+                    // Create new content message
+                    currentContentMsgId = uuid();
+                    currentTextContent = '';
                 } else if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
                     const delta = event.delta.text || '';
-                    accumulatedContent += delta;
+                    currentTextContent += delta;
                     console.log(`[Execution] text_delta, length:`, delta.length);
-                    connection.socket.send(JSON.stringify({
-                        type: 'conversation.chunk',
-                        taskId,
-                        messageId: assistantMessageId,
+
+                    // Send chunk and save immediately
+                    const contentMsg: ConversationMessage = {
+                        id: currentContentMsgId || uuid(),
+                        role: 'assistant',
                         content: delta,
-                    } as ConversationWsMessage));
+                        groupId,
+                        timestamp: new Date().toISOString(),
+                        status: 'streaming',
+                    };
+                    await sendAndSaveMessage(connection, taskId, projectPath, contentMsg);
                 } else if (event?.type === 'content_block_stop') {
                     console.log(`[Execution] content_block_stop`);
-                    // Update conversation storage
-                    const conv = await conversationStorage.load(taskId);
-                    if (conv) {
-                        const msg = conv.messages.find((m: any) => m.id === assistantMessageId);
-                        if (msg && msg.role === 'assistant') {
-                            (msg as any).content = accumulatedContent;
-                            (msg as any).status = 'streaming';
-                            await conversationStorage.save(taskId, conv);
-                        }
-                    }
+                    currentContentMsgId = null;
+                    currentTextContent = '';
                 }
             }
 
@@ -1140,31 +1184,43 @@ async function handleLaneExecutionWithAgent(
                     for (const block of content) {
                         if (block.type === 'text') {
                             console.log(`[Execution] assistant text block, length:`, block.text?.length || 0);
-                            accumulatedContent += block.text || '';
-                            connection.socket.send(JSON.stringify({
-                                type: 'conversation.chunk',
-                                taskId,
-                                messageId: assistantMessageId,
-                                content: block.text || '',
-                            } as ConversationWsMessage));
+                            // Text blocks also come through here for some messages
+                            if (block.text) {
+                                const contentMsg: ConversationMessage = {
+                                    id: uuid(),
+                                    role: 'assistant',
+                                    content: block.text,
+                                    groupId,
+                                    timestamp: new Date().toISOString(),
+                                    status: 'streaming',
+                                };
+                                await sendAndSaveMessage(connection, taskId, projectPath, contentMsg);
+                            }
                         } else if (block.type === 'tool_use') {
                             const toolName = block.name;
                             const toolInput = block.input;
-                            const toolId = `${assistantMessageId}-${toolName}`;
+                            const toolMsgId = uuid();
 
-                            const toolCall: ToolCall = {
+                            pendingToolCalls.set(toolName, {
                                 name: toolName,
                                 input: toolInput,
-                                status: 'pending',
-                            };
-                            toolCallsMap.set(toolId, toolCall);
+                                msgId: toolMsgId,
+                            });
                             console.log(`[Execution] tool_use:`, toolName);
 
-                            connection.socket.send(JSON.stringify({
-                                type: 'conversation.tool_call',
-                                taskId,
-                                toolCall,
-                            } as ConversationWsMessage));
+                            // Send tool_call_start message and save
+                            const toolMsg: ConversationMessage = {
+                                id: toolMsgId,
+                                role: 'assistant',
+                                toolCall: {
+                                    name: toolName,
+                                    input: toolInput,
+                                    status: 'pending',
+                                },
+                                groupId,
+                                timestamp: new Date().toISOString(),
+                            };
+                            await sendAndSaveMessage(connection, taskId, projectPath, toolMsg);
                         }
                     }
                 }
@@ -1177,18 +1233,46 @@ async function handleLaneExecutionWithAgent(
                     for (const block of content) {
                         if (block.type === 'tool_result') {
                             const toolName = block.name;
-                            const toolId = `${assistantMessageId}-${toolName}`;
-                            const toolCall = toolCallsMap.get(toolId);
-                            if (toolCall) {
-                                toolCall.status = block.is_error ? 'error' : 'success';
-                                toolCall.output = typeof block.content === 'string' ? block.content : JSON.stringify(block.content);
-                                console.log(`[Execution] tool_result:`, toolName, 'status:', toolCall.status);
+                            const pendingTool = pendingToolCalls.get(toolName);
+                            if (pendingTool) {
+                                const isError = block.is_error || false;
+                                const output = typeof block.content === 'string'
+                                    ? block.content
+                                    : JSON.stringify(block.content);
 
-                                connection.socket.send(JSON.stringify({
-                                    type: 'conversation.tool_call',
-                                    taskId,
-                                    toolCall,
-                                } as ConversationWsMessage));
+                                console.log(`[Execution] tool_result:`, toolName, 'status:', isError ? 'error' : 'success');
+
+                                // Update tool with output
+                                const toolOutputMsg: ConversationMessage = {
+                                    id: pendingTool.msgId,
+                                    role: 'assistant',
+                                    toolCall: {
+                                        name: toolName,
+                                        input: pendingTool.input,
+                                        output,
+                                        status: isError ? 'error' : 'success',
+                                    },
+                                    groupId,
+                                    timestamp: new Date().toISOString(),
+                                };
+                                await sendAndSaveMessage(connection, taskId, projectPath, toolOutputMsg);
+
+                                // Send tool_call_end
+                                const toolEndMsg: ConversationMessage = {
+                                    id: uuid(),
+                                    role: 'assistant',
+                                    toolCall: {
+                                        name: toolName,
+                                        input: pendingTool.input,
+                                        output,
+                                        status: isError ? 'error' : 'success',
+                                    },
+                                    groupId,
+                                    timestamp: new Date().toISOString(),
+                                };
+                                await sendAndSaveMessage(connection, taskId, projectPath, toolEndMsg);
+
+                                pendingToolCalls.delete(toolName);
                             }
                         }
                     }
@@ -1197,13 +1281,12 @@ async function handleLaneExecutionWithAgent(
 
             // Handle result
             else if (sdkMessage.type === 'result') {
-                console.log(`[Execution] ${laneName} execution completed, content length:`, accumulatedContent.length);
+                console.log(`[Execution] ${laneName} execution completed`);
 
                 // Check for structured output
                 if ((sdkMessage as any).structured_output) {
-                    console.log(`[Execution] Structured output received:`, JSON.stringify((sdkMessage as any).structured_output, null, 2));
+                    console.log(`[Execution] Structured output received`);
 
-                    // Save to task
                     const outputType = getOutputTypeForLane(task.laneId);
                     task.structuredOutput = {
                         type: outputType,
@@ -1213,7 +1296,6 @@ async function handleLaneExecutionWithAgent(
                     } as StructuredOutput;
                     await writeProjectData(project.path, data);
 
-                    // Send to frontend
                     connection.socket.send(JSON.stringify({
                         type: 'structured-output',
                         taskId,
@@ -1221,27 +1303,14 @@ async function handleLaneExecutionWithAgent(
                     } as ConversationWsMessage));
                 }
 
-                // Mark assistant message as complete
-                const conv = await conversationStorage.load(taskId);
-                if (conv) {
-                    const msg = conv.messages.find((m: any) => m.id === assistantMessageId);
-                    if (msg && msg.role === 'assistant') {
-                        (msg as any).content = accumulatedContent;
-                        (msg as any).status = 'complete';
-                        if (toolCallsMap.size > 0) {
-                            (msg as any).toolCalls = Array.from(toolCallsMap.values());
-                        }
-                        await conversationStorage.save(taskId, conv);
-                    }
-                }
-
+                // Send chunk_end
                 connection.socket.send(JSON.stringify({
                     type: 'conversation.chunk_end',
                     taskId,
-                    messageId: assistantMessageId,
+                    groupId,
                 } as ConversationWsMessage));
 
-                // Add completion message to conversation
+                // Add completion message
                 const completeMessage: ConversationMessage = {
                     id: uuid(),
                     role: 'system',
@@ -1249,11 +1318,7 @@ async function handleLaneExecutionWithAgent(
                     type: 'info',
                     timestamp: new Date().toISOString(),
                 };
-                const finalConv = await conversationStorage.load(taskId);
-                if (finalConv) {
-                    finalConv.messages.push(completeMessage);
-                    await conversationStorage.save(taskId, finalConv);
-                }
+                await sendAndSaveMessage(connection, taskId, projectPath, completeMessage);
 
                 connection.socket.send(JSON.stringify({
                     type: 'conversation.execute_complete',
@@ -1268,19 +1333,24 @@ async function handleLaneExecutionWithAgent(
     } catch (error: any) {
         console.error(`[Execution] ${laneName} execution error:`, error);
 
-        // Save error to conversation
-        const conv = await conversationStorage.load(taskId);
-        if (conv) {
-            const errorMessage: ConversationMessage = {
-                id: uuid(),
-                role: 'system',
-                content: `错误: ${error.message}`,
-                type: 'error',
-                timestamp: new Date().toISOString(),
-            };
-            conv.messages.push(errorMessage);
-            await conversationStorage.save(taskId, conv);
+        // Update task status to failed
+        const result = await findTask(taskId);
+        if (result) {
+            result.task.status = 'failed';
+            result.task.updatedAt = new Date().toISOString();
+            await writeProjectData(result.project.path, result.data);
+            console.log(`[Execution] ${laneType} task ${taskId} status set to failed`);
         }
+
+        // Save error to conversation
+        const errorMessage: ConversationMessage = {
+            id: uuid(),
+            role: 'system',
+            content: `错误: ${error.message}`,
+            type: 'error',
+            timestamp: new Date().toISOString(),
+        };
+        await sendAndSaveMessage(connection, taskId, projectPath, errorMessage);
 
         connection.socket.send(JSON.stringify({
             type: 'conversation.error',

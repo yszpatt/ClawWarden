@@ -7,6 +7,18 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, selected, onClick }: TaskCardProps) {
+    // Status translation
+    const statusLabels: Record<string, string> = {
+        'idle': '待执行',
+        'running': '执行中',
+        'completed': '已完成',
+        'failed': '失败',
+        'pending-dev': '待开发',
+        'pending-merge': '待合并',
+    };
+
+    const statusLabel = statusLabels[task.status] || task.status;
+
     return (
         <div
             className={`task-card ${selected ? 'selected' : ''}`}
@@ -17,9 +29,9 @@ export function TaskCard({ task, selected, onClick }: TaskCardProps) {
                 <div className="task-description">{task.description}</div>
             )}
             <div className="task-meta">
-                <span className={`task-status ${task.status}`}>{task.status}</span>
+                <span className={`task-status ${task.status}`}>{statusLabel}</span>
                 <span className={`task-creator ${task.createdBy}`}>
-                    {task.createdBy === 'claude' ? '🤖 Claude' : '👤 User'}
+                    {task.createdBy === 'claude' ? '🤖 Claude' : '👤 用户'}
                 </span>
             </div>
         </div>

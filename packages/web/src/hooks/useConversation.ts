@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { connectionManager } from '../services/ConnectionManager';
-import type { ConversationMessage } from '@antiwarden/shared';
+import type { ConversationMessage, AssistantMessage } from '@antiwarden/shared';
 import { fetchConversation, clearConversation as apiClearConversation } from '../api/conversation';
 
 interface UseConversationOptions {
@@ -11,7 +11,7 @@ interface UseConversationOptions {
 export function useConversation({ taskId, projectId }: UseConversationOptions) {
     const [messages, setMessages] = useState<ConversationMessage[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
-    const currentMessageRef = useRef<Map<string, string>>(new Map());
+    const currentGroupIdRef = useRef<string | null>(null);
 
     // Load conversation on mount
     useEffect(() => {
@@ -29,90 +29,125 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
     // Subscribe to WebSocket messages
     useEffect(() => {
         const handleMessage = (message: any) => {
-            console.log('[useConversation] Received message:', message.type, 'taskId:', message.taskId, 'expected taskId:', taskId);
-
-            if (message.taskId !== taskId) {
-                console.log('[useConversation] Skipping message - taskId mismatch');
-                return;
-            }
-
-            console.log('[useConversation] Processing message type:', message.type);
+            if (message.taskId !== taskId) return;
 
             switch (message.type) {
                 case 'conversation.chunk_start':
-                    console.log('[useConversation] chunk_start, messageId:', message.messageId);
+                    // Start of a new assistant response group
                     setIsStreaming(true);
-                    // Add placeholder message
-                    setMessages(prev => {
-                        const newMessages = [...prev, {
-                            id: message.messageId,
-                            role: 'assistant' as const,
-                            content: '',
-                            timestamp: new Date().toISOString(),
-                            status: 'streaming' as const,
-                        }];
-                        console.log('[useConversation] Added placeholder message, total messages:', newMessages.length);
-                        return newMessages;
-                    });
-                    currentMessageRef.current.set(message.messageId, '');
+                    currentGroupIdRef.current = message.groupId || `group-${Date.now()}`;
                     break;
 
                 case 'conversation.chunk':
-                    const existing = currentMessageRef.current.get(message.messageId) || '';
-                    const updated = existing + (message.content || '');
-                    currentMessageRef.current.set(message.messageId, updated);
-                    console.log('[useConversation] chunk, messageId:', message.messageId, 'content preview:', updated.slice(0, 50));
+                    // Text content chunk - append to current text message or create new one
                     setMessages(prev => {
-                        const result = prev.map(msg =>
-                            msg.id === message.messageId
-                                ? { ...msg, content: updated }
-                                : msg
+                        const lastMsg = prev[prev.length - 1];
+                        const groupId = message.groupId || currentGroupIdRef.current;
+
+                        // If last message is an assistant text message in the same group, append to it
+                        if (lastMsg?.role === 'assistant' && (lastMsg as AssistantMessage).content && !lastMsg.status) {
+                            const updated = [...prev];
+                            (updated[updated.length - 1] as AssistantMessage).content =
+                                (lastMsg as AssistantMessage).content! + (message.content || '');
+                            return updated;
+                        }
+
+                        // Otherwise, create a new text message
+                        return [...prev, {
+                            id: message.messageId || `msg-${Date.now()}`,
+                            role: 'assistant' as const,
+                            content: message.content || '',
+                            groupId,
+                            timestamp: new Date().toISOString(),
+                        }];
+                    });
+                    break;
+
+                case 'conversation.thinking':
+                    // Thinking content - new message
+                    setMessages(prev => {
+                        // Remove previous thinking message in the same group if any
+                        const groupId = message.groupId || currentGroupIdRef.current;
+                        const filtered = prev.filter(m =>
+                            !((m as AssistantMessage).thinking && (m as AssistantMessage).groupId === groupId)
                         );
-                        console.log('[useConversation] Updated message, found match:', result.some(m => m.id === message.messageId));
-                        return result;
+
+                        return [...filtered, {
+                            id: `thinking-${Date.now()}`,
+                            role: 'assistant' as const,
+                            thinking: message.content || '',
+                            groupId,
+                            timestamp: new Date().toISOString(),
+                        }];
+                    });
+                    break;
+
+                case 'conversation.tool_call_start':
+                    // Tool call starts - add tool message with pending status
+                    setMessages(prev => {
+                        const groupId = message.groupId || currentGroupIdRef.current;
+                        return [...prev, {
+                            id: `tool-${message.toolCall?.name}-${Date.now()}`,
+                            role: 'assistant' as const,
+                            toolCall: { ...message.toolCall!, status: 'pending' },
+                            groupId,
+                            timestamp: new Date().toISOString(),
+                        }];
+                    });
+                    break;
+
+                case 'conversation.tool_call_output':
+                    // Tool call has output - update the tool message
+                    setMessages(prev => {
+                        return prev.map(msg => {
+                            const assistantMsg = msg as AssistantMessage;
+                            if (assistantMsg.toolCall && assistantMsg.toolCall.name === message.toolCall?.name) {
+                                return {
+                                    ...msg,
+                                    toolCall: {
+                                        ...assistantMsg.toolCall,
+                                        output: message.toolCall?.output,
+                                    },
+                                };
+                            }
+                            return msg;
+                        });
+                    });
+                    break;
+
+                case 'conversation.tool_call_end':
+                    // Tool call completed - update status
+                    setMessages(prev => {
+                        return prev.map(msg => {
+                            const assistantMsg = msg as AssistantMessage;
+                            if (assistantMsg.toolCall && assistantMsg.toolCall.name === message.toolCall?.name) {
+                                return {
+                                    ...msg,
+                                    toolCall: {
+                                        ...assistantMsg.toolCall,
+                                        status: message.toolCall?.status || 'success',
+                                        duration: message.toolCall?.duration,
+                                    },
+                                };
+                            }
+                            return msg;
+                        });
                     });
                     break;
 
                 case 'conversation.chunk_end':
-                    console.log('[useConversation] chunk_end, messageId:', message.messageId, 'setting isStreaming to false');
+                    // Mark the last message as complete
+                    setMessages(prev => {
+                        const groupId = message.groupId || currentGroupIdRef.current;
+                        return prev.map(msg => {
+                            if (msg.role === 'assistant' && (msg as AssistantMessage).groupId === groupId) {
+                                return { ...msg, status: 'complete' as const };
+                            }
+                            return msg;
+                        });
+                    });
                     setIsStreaming(false);
-                    setMessages(prev => {
-                        const result = prev.map(msg =>
-                            msg.id === message.messageId
-                                ? { ...msg, status: 'complete' as const }
-                                : msg
-                        );
-                        console.log('[useConversation] Marked message as complete, messages:', result.length);
-                        return result;
-                    });
-                    break;
-
-                case 'conversation.thinking_start':
-                    setMessages(prev => [...prev, {
-                        id: `thinking-${Date.now()}`,
-                        role: 'system',
-                        content: message.content || '',
-                        type: 'info' as const,
-                        timestamp: new Date().toISOString(),
-                    }]);
-                    break;
-
-                case 'conversation.tool_call':
-                    setMessages(prev => {
-                        const lastMsg = prev[prev.length - 1];
-                        if (lastMsg && lastMsg.role === 'assistant') {
-                            const assistantMsg = lastMsg as any;
-                            return prev.map((msg, i) =>
-                                i === prev.length - 1
-                                    ? {
-                                        ...msg,
-                                        toolCalls: [...(assistantMsg.toolCalls || []), message.toolCall],
-                                    } as any
-                                    : msg
-                            );
-                        }
-                        return prev;
-                    });
+                    currentGroupIdRef.current = null;
                     break;
 
                 case 'conversation.error':
@@ -128,9 +163,7 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
             }
         };
 
-        // Ensure WebSocket is connected
         connectionManager.connect();
-
         const unsubscribe = connectionManager.subscribe(taskId, handleMessage);
         return () => unsubscribe();
     }, [taskId]);
@@ -148,7 +181,6 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
 
         setMessages(prev => [...prev, userMessage]);
 
-        // Send via WebSocket
         connectionManager.send({
             type: 'conversation.user_input',
             taskId,

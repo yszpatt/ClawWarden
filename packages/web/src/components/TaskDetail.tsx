@@ -30,6 +30,20 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     // Store the latest fetched task data (including claudeSession which may be updated by backend)
     const [fetchedTask, setFetchedTask] = useState<Task | null>(null);
 
+    // Sync task prop changes to fetchedTask (handles status updates from WebSocket)
+    useEffect(() => {
+        // Merge task prop with existing fetchedTask to preserve fields like claudeSession
+        setFetchedTask(prev => {
+            const base = prev || task;
+            return {
+                ...base,
+                status: task.status,
+                laneId: task.laneId,
+                updatedAt: task.updatedAt,
+            };
+        });
+    }, [task.status, task.laneId, task.updatedAt]);
+
     // Create a ref object for the terminal
     const terminalRef = useRef<TerminalRef>(null);
 
@@ -305,13 +319,18 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     };
 
     const handleDelete = async () => {
-        if (confirm('Are you sure you want to delete this task?')) {
+        const hasWorktree = !!task.worktree;
+        const message = hasWorktree
+            ? `确定要删除此任务吗？\n\n此操作将同时删除关联的 Worktree:\n${task.worktree?.path}\n\n⚠️ 此操作不可撤销！`
+            : '确定要删除此任务吗？\n\n⚠️ 此操作不可撤销！';
+
+        if (confirm(message)) {
             try {
                 await removeTask(task.id);
                 // Sidebar close is handled by store but let's be safe
                 if (onClose) onClose();
             } catch (error) {
-                alert('Failed to delete task');
+                alert('删除任务失败');
             }
         }
     };
@@ -338,21 +357,31 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                         ⏳ 正在生成设计方案...
                     </button>
                 );
-            } else if (task.status === 'pending-dev') {
+            } else if (task.status === 'failed') {
                 return (
-                    <span className="status-badge success">✓ 设计完成，可移至开发泳道</span>
+                    <button
+                        className="primary-btn"
+                        onClick={handleGenerateDesign}
+                        disabled={isGeneratingDesign}
+                        style={{ background: '#F59E0B' }}
+                    >
+                        {isGeneratingDesign ? '⏳ 正在生成...' : '🔄 重新生成设计'}
+                    </button>
                 );
             }
         } else if (laneId === 'develop' || laneId === 'test') {
             // 开发/测试泳道：显示执行按钮
             if (!isRunningState) {
+                const isFailed = task.status === 'failed';
+                const canExecute = task.prompt || task.designPath;
                 return (
                     <button
                         className="primary-btn"
                         onClick={handleExecute}
-                        disabled={!task.prompt && !task.designPath}
+                        disabled={!canExecute}
+                        style={isFailed ? { background: '#F59E0B' } : undefined}
                     >
-                        ▶ 开始执行
+                        {isFailed ? '🔄 重试执行' : '▶ 开始执行'}
                     </button>
                 );
             } else {
@@ -575,7 +604,15 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
 
                 <div className="form-group">
                     <label className="form-label">状态</label>
-                    <span className={`task-status ${task.status}`}>{task.status}</span>
+                    <span className={`task-status ${task.status}`}>{
+                        task.status === 'idle' ? '待执行' :
+                        task.status === 'running' ? '执行中' :
+                        task.status === 'completed' ? '已完成' :
+                        task.status === 'failed' ? '失败' :
+                        task.status === 'pending-dev' ? '待开发' :
+                        task.status === 'pending-merge' ? '待合并' :
+                        task.status
+                    }</span>
                 </div>
 
                 <div className="form-group">
