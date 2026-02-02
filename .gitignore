@@ -3,3 +3,10 @@ dist/
 .env
 *.log
 .DS_Store
+
+# Agent specific
+.agent/
+.antigravity/
+
+# Documentation (Optional: Remove if you want to commit docs/)
+docs/
