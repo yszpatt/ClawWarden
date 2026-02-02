@@ -4,21 +4,21 @@ import type { Conversation, ConversationMessage } from '@clawwarden/shared';
 
 /**
  * File-based conversation storage
- * Stores conversations at {projectPath}/.antiwarden/sessions/{taskId}.json
+ * Stores conversations at {projectPath}/.clawwarden/sessions/{taskId}.json
  */
 export class ConversationStorage {
     /**
      * Get session file path for a task in a project
      */
     getSessionPath(projectPath: string, taskId: string): string {
-        return path.join(projectPath, '.antiwarden', 'sessions', `${taskId}.json`);
+        return path.join(projectPath, '.clawwarden', 'sessions', `${taskId}.json`);
     }
 
     /**
      * Get sessions directory for a project
      */
     getSessionsDir(projectPath: string): string {
-        return path.join(projectPath, '.antiwarden', 'sessions');
+        return path.join(projectPath, '.clawwarden', 'sessions');
     }
 
     /**

@@ -83,7 +83,7 @@ export class WorktreeManager {
             console.log('[WorktreeManager] Repository is empty, creating initial commit...');
             // Create a .gitignore file if it doesn't exist
             try {
-                await execAsync('test -f .gitignore || echo "node_modules/\n.antiwarden/\n.worktrees/" > .gitignore', { cwd: projectPath });
+                await execAsync('test -f .gitignore || echo "node_modules/\n.clawwarden/\n.worktrees/" > .gitignore', { cwd: projectPath });
                 await execAsync('git add -A', { cwd: projectPath });
                 await execAsync('git commit --allow-empty -m "Initial commit by ClawWarden"', { cwd: projectPath });
                 console.log('[WorktreeManager] Initial commit created');
@@ -186,7 +186,7 @@ export class WorktreeManager {
         }
 
         // Note: We do NOT delete the conversation history here
-        // Conversation history is stored in {projectPath}/.antiwarden/sessions/
+        // Conversation history is stored in {projectPath}/.clawwarden/sessions/
         // and should be preserved even after worktree is removed
     }
 

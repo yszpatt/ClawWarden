@@ -938,14 +938,14 @@ async function handleConversationDesignStart(
                     // Only save design if there's actual content
                     if (currentTextContent.trim().length > 0) {
                         // Save design to project directory (not worktree) so it persists after merge
-                        const designsDir = path.join(project.path, '.antiwarden', 'designs');
+                        const designsDir = path.join(project.path, '.clawwarden', 'designs');
                         await fs.mkdir(designsDir, { recursive: true });
                         const designFileName = `${task.id}-design.md`;
                         const designPath = path.join(designsDir, designFileName);
                         await fs.writeFile(designPath, currentTextContent, 'utf-8');
 
                         // Store designPath relative to project directory
-                        task.designPath = `.antiwarden/designs/${designFileName}`;
+                        task.designPath = `.clawwarden/designs/${designFileName}`;
 
                         // Update task status and move to develop lane
                         task.status = 'idle';
@@ -1204,10 +1204,10 @@ async function handleLaneExecutionWithAgent(
         if (task.designPath) {
             // Design file is in project directory, need to reference from worktree
             // worktree path: {projectPath}/.worktrees/{taskId}
-            // design file: {projectPath}/.antiwarden/designs/{taskId}-design.md
-            // relative path from worktree: ../../.antiwarden/designs/{taskId}-design.md
+            // design file: {projectPath}/.clawwarden/designs/{taskId}-design.md
+            // relative path from worktree: ../../.clawwarden/designs/{taskId}-design.md
             const designFileName = task.designPath.split('/').pop(); // Get {taskId}-design.md
-            const relativeDesignPath = `../../.antiwarden/designs/${designFileName}`;
+            const relativeDesignPath = `../../.clawwarden/designs/${designFileName}`;
             prompt = `${lanePrompt}\n\n请按照 @${relativeDesignPath} 中的设计方案执行任务。`;
         } else {
             prompt = lanePrompt || '请继续执行任务。';

@@ -134,7 +134,7 @@ export async function taskRoutes(fastify: FastifyInstance) {
 
         // Delete design file if exists
         try {
-            const designPath = path.join(project.path, '.antiwarden', 'designs', `${taskId}-design.md`);
+            const designPath = path.join(project.path, '.clawwarden', 'designs', `${taskId}-design.md`);
             await fs.unlink(designPath);
             console.log(`[Tasks] Deleted design file for task: ${taskId}`);
         } catch (error: any) {

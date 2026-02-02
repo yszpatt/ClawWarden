@@ -30,7 +30,7 @@ async function ensureGitRepo(projectPath: string): Promise<void> {
         console.log('[Project] Initializing git repository in:', projectPath);
         await execAsync('git init', { cwd: projectPath });
         // Create initial commit with .gitignore
-        await execAsync('echo "node_modules/\\n.antiwarden/\\n.worktrees/" > .gitignore', { cwd: projectPath });
+        await execAsync('echo "node_modules/\\n.clawwarden/\\n.worktrees/" > .gitignore', { cwd: projectPath });
         await execAsync('git add .gitignore', { cwd: projectPath });
         await execAsync('git commit -m "Initial commit by ClawWarden"', { cwd: projectPath });
         console.log('[Project] Git repository initialized with initial commit');

@@ -20,7 +20,7 @@ export async function designRoutes(fastify: FastifyInstance) {
             throw { statusCode: 404, message: 'Design document not found' };
         }
 
-        // Design files are now stored in project directory: {projectPath}/.antiwarden/designs/
+        // Design files are now stored in project directory: {projectPath}/.clawwarden/designs/
         const designFullPath = path.join(project.path, task.designPath);
         const content = await fs.readFile(designFullPath, 'utf-8');
 
@@ -47,7 +47,7 @@ export async function designRoutes(fastify: FastifyInstance) {
             throw { statusCode: 400, message: 'Task has no design document' };
         }
 
-        // Design files are now stored in project directory: {projectPath}/.antiwarden/designs/
+        // Design files are now stored in project directory: {projectPath}/.clawwarden/designs/
         const designFullPath = path.join(project.path, task.designPath);
         await fs.writeFile(designFullPath, request.body.content, 'utf-8');
 
