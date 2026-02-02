@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { conversationStorage } from '../services/conversation-storage';
 import { readGlobalConfig } from '../utils/json-store';
-import type { Conversation, ConversationMessage } from '@antiwarden/shared';
+import type { Conversation, ConversationMessage, AssistantMessage } from '@antiwarden/shared';
 
 export async function conversationRoutes(fastify: FastifyInstance) {
     // Get conversation for a task
@@ -88,17 +88,33 @@ function conversationToMarkdown(conversation: Conversation): string {
         if (message.role === 'user') {
             md += `## User (${timestamp})\n\n${message.content}\n\n`;
         } else if (message.role === 'assistant') {
-            md += `## Assistant (${timestamp})\n\n${message.content}\n\n`;
-            const assistantMsg = message as any;
+            const assistantMsg = message as AssistantMessage;
+            md += `## Assistant (${timestamp})\n\n`;
+            if (assistantMsg.content) {
+                md += `${assistantMsg.content}\n\n`;
+            }
             if (assistantMsg.thinking) {
                 md += `<details>\n<summary>Thinking Process</summary>\n\n${assistantMsg.thinking}\n\n</details>\n\n`;
             }
-            if (assistantMsg.toolCalls && assistantMsg.toolCalls.length > 0) {
-                md += `<details>\n<summary>Tool Calls (${assistantMsg.toolCalls.length})</summary>\n\n`;
-                for (const tool of assistantMsg.toolCalls) {
+            // Note: toolCalls is the old format, new format uses toolCall
+            if ((assistantMsg as any).toolCalls && (assistantMsg as any).toolCalls.length > 0) {
+                const toolCalls = (assistantMsg as any).toolCalls;
+                md += `<details>\n<summary>Tool Calls (${toolCalls.length})</summary>\n\n`;
+                for (const tool of toolCalls) {
                     md += `- **${tool.name}**: ${JSON.stringify(tool.input)}\n`;
                 }
                 md += `\n</details>\n\n`;
+            }
+            if (assistantMsg.toolCall) {
+                const tool = assistantMsg.toolCall;
+                md += `<details>\n<summary>Tool Call: ${tool.name}</summary>\n\n`;
+                if (tool.input) {
+                    md += `**Input:**\n\`\`\`\n${typeof tool.input === 'string' ? tool.input : JSON.stringify(tool.input, null, 2)}\n\`\`\`\n\n`;
+                }
+                if (tool.output) {
+                    md += `**Output:**\n\`\`\`\n${tool.output}\n\`\`\`\n\n`;
+                }
+                md += `**Status:** ${tool.status}\n\n</details>\n\n`;
             }
         } else if (message.role === 'system') {
             md += `> ${message.content}\n\n`;

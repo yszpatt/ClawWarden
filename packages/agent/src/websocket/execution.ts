@@ -42,18 +42,22 @@ async function sendAndSaveMessage(
             wsMessage.content = assistantMsg.thinking;
         } else if (assistantMsg.toolCall) {
             const tool = assistantMsg.toolCall;
-            if (tool.status === 'pending') {
+            // Plan A: Only send tool_call_start or tool_call_output
+            // tool_call_start: status='pending' (first message)
+            // tool_call_output: has output and final status (success/error)
+            if (tool.status === 'pending' && !tool.output) {
                 wsMessage.type = 'conversation.tool_call_start';
                 wsMessage.groupId = assistantMsg.groupId;
+                wsMessage.messageId = message.id;  // Include id so frontend can match and update
                 wsMessage.toolCall = tool;
-            } else if (tool.output) {
+                console.log('[Execution] Sending tool_call_start:', { id: message.id, toolName: tool.name, groupId: assistantMsg.groupId });
+            } else {
+                // Has output or final status - send as tool_call_output
                 wsMessage.type = 'conversation.tool_call_output';
                 wsMessage.groupId = assistantMsg.groupId;
+                wsMessage.messageId = message.id;  // Include id for frontend to match and update
                 wsMessage.toolCall = tool;
-            } else {
-                wsMessage.type = 'conversation.tool_call_end';
-                wsMessage.groupId = assistantMsg.groupId;
-                wsMessage.toolCall = tool;
+                console.log('[Execution] Sending tool_call_output:', { id: message.id, toolName: tool.name, status: tool.status, hasOutput: !!tool.output });
             }
         }
     }
@@ -608,12 +612,21 @@ async function handleConversationUserMessage(
             // Track tool calls by name for updating
             const key = `${assistantMessageId}-${toolCall.name}`;
             toolCallsMap.set(key, toolCall);
-            console.log('[Execution] onConversationToolCall:', toolCall.name);
+            console.log('[Execution] onConversationToolCall:', toolCall.name, 'status:', toolCall.status, 'has output:', !!toolCall.output);
 
-            // Send tool_call_start message
+            // Check if this is a tool start or completion based on output presence
+            const isComplete = toolCall.output !== undefined;
+            const messageType = isComplete ? 'conversation.tool_call_output' : 'conversation.tool_call_start';
+
+            // Generate a consistent message ID based on assistantMessageId and tool name
+            // This allows frontend to match start and end events
+            const toolMessageId = `${assistantMessageId}-${toolCall.name}`;
+
             connection.socket.send(JSON.stringify({
-                type: 'conversation.tool_call_start',
+                type: messageType,
                 taskId,
+                messageId: toolMessageId,
+                groupId: assistantMessageId,
                 toolCall,
             } as unknown as ConversationWsMessage));
         },
@@ -1148,6 +1161,12 @@ async function handleLaneExecutionWithAgent(
             // Handle stream events (most content comes through here)
             if (sdkMessage.type === 'stream_event') {
                 const event = (sdkMessage as any).event;
+                console.log(`[Execution] stream_event type:`, event?.type, 'block type:', event?.block?.type, 'delta type:', event?.delta?.type);
+
+                // Tool result event (when tool completes)
+                if (event?.type === 'tool_use_block_stop' || event?.type === 'tool_result') {
+                    console.log('[Execution] Tool result event detected:', event?.type);
+                }
 
                 // Text content streaming
                 if (event?.type === 'content_block_start' && event.block?.type === 'text') {
@@ -1174,6 +1193,63 @@ async function handleLaneExecutionWithAgent(
                     console.log(`[Execution] content_block_stop`);
                     currentContentMsgId = null;
                     currentTextContent = '';
+
+                    // Check if this is the end of a tool_use block
+                    // If so, mark the tool as complete (SDK doesn't send separate tool result events)
+                    if (event?.block?.type === 'tool_use') {
+                        const toolUseId = event.block.id;  // Use tool_use_id
+                        console.log(`[Execution] tool_use block stopped for id:`, toolUseId);
+
+                        // Mark tool as complete since SDK handles execution internally
+                        const pendingTool = pendingToolCalls.get(toolUseId);
+                        if (pendingTool) {
+                            console.log(`[Execution] Marking tool as complete (SDK handled):`, pendingTool.name);
+
+                            // Send tool_call_output message with success status
+                            const toolMsg: ConversationMessage = {
+                                id: pendingTool.msgId,
+                                role: 'assistant',
+                                toolCall: {
+                                    name: pendingTool.name,
+                                    input: pendingTool.input,
+                                    output: 'Tool executed by SDK',
+                                    status: 'success',
+                                },
+                                groupId,
+                                timestamp: new Date().toISOString(),
+                            };
+                            await sendAndSaveMessage(connection, taskId, projectPath, toolMsg);
+
+                            pendingToolCalls.delete(toolUseId);
+                        }
+                    }
+                } else if (event?.type === 'content_block_start' && event.block?.type === 'tool_use') {
+                    const toolName = event.block.name;
+                    const toolInput = event.block.input;
+                    const toolUseId = event.block.id;  // Get tool_use_id
+                    const toolMsgId = uuid();
+
+                    // Use tool_use_id as key
+                    pendingToolCalls.set(toolUseId, {
+                        name: toolName,
+                        input: toolInput,
+                        msgId: toolMsgId,
+                    });
+                    console.log(`[Execution] stream_event tool_use start:`, toolName, 'id:', toolUseId);
+
+                    // Send tool_call_start message and save
+                    const toolMsg: ConversationMessage = {
+                        id: toolMsgId,
+                        role: 'assistant',
+                        toolCall: {
+                            name: toolName,
+                            input: toolInput,
+                            status: 'pending',
+                        },
+                        groupId,
+                        timestamp: new Date().toISOString(),
+                    };
+                    await sendAndSaveMessage(connection, taskId, projectPath, toolMsg);
                 }
             }
 
@@ -1199,14 +1275,16 @@ async function handleLaneExecutionWithAgent(
                         } else if (block.type === 'tool_use') {
                             const toolName = block.name;
                             const toolInput = block.input;
+                            const toolUseId = block.id;  // Store the tool_use_id for matching
                             const toolMsgId = uuid();
 
-                            pendingToolCalls.set(toolName, {
+                            // Use tool_use_id as key since tool_result uses tool_use_id to match
+                            pendingToolCalls.set(toolUseId, {
                                 name: toolName,
                                 input: toolInput,
                                 msgId: toolMsgId,
                             });
-                            console.log(`[Execution] tool_use:`, toolName);
+                            console.log(`[Execution] tool_use:`, toolName, 'id:', toolUseId);
 
                             // Send tool_call_start message and save
                             const toolMsg: ConversationMessage = {
@@ -1228,26 +1306,30 @@ async function handleLaneExecutionWithAgent(
 
             // Handle user messages (tool results)
             else if (sdkMessage.type === 'user') {
+                console.log('[Execution] User message received, checking for tool_result...');
                 const content = (sdkMessage as any).message?.content;
+                console.log('[Execution] User message content is array:', Array.isArray(content), 'length:', content?.length);
                 if (Array.isArray(content)) {
                     for (const block of content) {
                         if (block.type === 'tool_result') {
-                            const toolName = block.name;
-                            const pendingTool = pendingToolCalls.get(toolName);
+                            const toolUseId = block.tool_use_id;  // Use tool_use_id to match
+                            console.log('[Execution] tool_result for tool_use_id:', toolUseId);
+                            const pendingTool = pendingToolCalls.get(toolUseId);
                             if (pendingTool) {
                                 const isError = block.is_error || false;
                                 const output = typeof block.content === 'string'
                                     ? block.content
                                     : JSON.stringify(block.content);
 
-                                console.log(`[Execution] tool_result:`, toolName, 'status:', isError ? 'error' : 'success');
+                                console.log(`[Execution] tool_result:`, pendingTool.name, 'status:', isError ? 'error' : 'success');
 
-                                // Update tool with output
-                                const toolOutputMsg: ConversationMessage = {
+                                // Plan A: Send single message with output and final status
+                                // Use the same message id so frontend can update instead of adding new
+                                const toolMsg: ConversationMessage = {
                                     id: pendingTool.msgId,
                                     role: 'assistant',
                                     toolCall: {
-                                        name: toolName,
+                                        name: pendingTool.name,
                                         input: pendingTool.input,
                                         output,
                                         status: isError ? 'error' : 'success',
@@ -1255,24 +1337,11 @@ async function handleLaneExecutionWithAgent(
                                     groupId,
                                     timestamp: new Date().toISOString(),
                                 };
-                                await sendAndSaveMessage(connection, taskId, projectPath, toolOutputMsg);
+                                await sendAndSaveMessage(connection, taskId, projectPath, toolMsg);
 
-                                // Send tool_call_end
-                                const toolEndMsg: ConversationMessage = {
-                                    id: uuid(),
-                                    role: 'assistant',
-                                    toolCall: {
-                                        name: toolName,
-                                        input: pendingTool.input,
-                                        output,
-                                        status: isError ? 'error' : 'success',
-                                    },
-                                    groupId,
-                                    timestamp: new Date().toISOString(),
-                                };
-                                await sendAndSaveMessage(connection, taskId, projectPath, toolEndMsg);
-
-                                pendingToolCalls.delete(toolName);
+                                pendingToolCalls.delete(toolUseId);
+                            } else {
+                                console.log('[Execution] No pending tool found for tool_use_id:', toolUseId, 'pending tools:', Array.from(pendingToolCalls.keys()));
                             }
                         }
                     }
@@ -1282,6 +1351,30 @@ async function handleLaneExecutionWithAgent(
             // Handle result
             else if (sdkMessage.type === 'result') {
                 console.log(`[Execution] ${laneName} execution completed`);
+
+                // Mark any remaining pending tools as complete
+                if (pendingToolCalls.size > 0) {
+                    console.log(`[Execution] Marking ${pendingToolCalls.size} pending tools as complete`);
+                    for (const [toolUseId, pendingTool] of pendingToolCalls) {
+                        console.log(`[Execution] Completing tool:`, pendingTool.name);
+
+                        // Send tool_call_output message with success status
+                        const toolMsg: ConversationMessage = {
+                            id: pendingTool.msgId,
+                            role: 'assistant',
+                            toolCall: {
+                                name: pendingTool.name,
+                                input: pendingTool.input,
+                                output: 'Tool executed',
+                                status: 'success',
+                            },
+                            groupId,
+                            timestamp: new Date().toISOString(),
+                        };
+                        await sendAndSaveMessage(connection, taskId, projectPath, toolMsg);
+                    }
+                    pendingToolCalls.clear();
+                }
 
                 // Check for structured output
                 if ((sdkMessage as any).structured_output) {
@@ -1300,6 +1393,28 @@ async function handleLaneExecutionWithAgent(
                         type: 'structured-output',
                         taskId,
                         output: (sdkMessage as any).structured_output,
+                    } as ConversationWsMessage));
+                }
+
+                // Update task status to completed/idle and move lane
+                task.status = 'idle';
+                task.updatedAt = new Date().toISOString();
+
+                // Auto-move from develop to test lane
+                if (task.laneId === 'develop') {
+                    task.laneId = 'test';
+                }
+
+                await writeProjectData(project.path, data);
+                console.log(`[Execution] ${laneName} task completed, status: idle, lane: ${task.laneId}`);
+
+                // Send status update notification
+                if (connection.socket.readyState === 1) {
+                    connection.socket.send(JSON.stringify({
+                        type: 'task_status',
+                        taskId,
+                        status: 'idle',
+                        laneId: task.laneId,
                     } as ConversationWsMessage));
                 }
 

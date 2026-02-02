@@ -1,9 +1,11 @@
 /**
  * Global WebSocket Manager (Singleton)
- * 
+ *
  * Maintains a single WebSocket connection to /ws/execute
  * and routes messages to subscribed task handlers.
  */
+
+import type { ToolCall } from '@antiwarden/shared';
 
 export interface WsMessage {
     type: string;
@@ -19,11 +21,13 @@ export interface WsMessage {
     content?: string;  // For design-complete
     // Conversation message fields
     messageId?: string;
-    toolCall?: any;
+    groupId?: string;  // Group multiple assistant messages together
+    toolCall?: Partial<ToolCall>;  // Partial because some fields may be missing
     error?: string;
     // Task status update fields
     status?: string;
     laneId?: string;
+    structuredOutput?: unknown;
 }
 
 type MessageHandler = (message: WsMessage) => void;
@@ -265,6 +269,10 @@ export class ConnectionManager {
      * Handle incoming WebSocket message
      */
     private handleMessage(message: WsMessage): void {
+        // Log tool call related messages for debugging
+        if (message.type === 'conversation.tool_call_start' || message.type === 'conversation.tool_call_output') {
+            console.log('[ConnectionManager] Received:', message.type, 'messageId:', message.messageId, 'toolCall:', message.toolCall);
+        }
         console.log('[ConnectionManager] Received message type:', message.type, 'taskId:', message.taskId);
 
         const taskId = message.taskId;

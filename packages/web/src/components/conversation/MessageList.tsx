@@ -12,7 +12,7 @@ type MessageGroup = ConversationMessage | { type: 'tool_group'; groupId: string;
 
 export function MessageList({ messages, isStreaming }: MessageListProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -42,13 +42,13 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
         return acc;
     }, []);
 
-    const toggleGroup = (groupId: string) => {
-        setExpandedGroups(prev => {
+    const toggleGroup = (uniqueId: string) => {
+        setExpandedIds(prev => {
             const next = new Set(prev);
-            if (next.has(groupId)) {
-                next.delete(groupId);
+            if (next.has(uniqueId)) {
+                next.delete(uniqueId);
             } else {
-                next.add(groupId);
+                next.add(uniqueId);
             }
             return next;
         });
@@ -72,14 +72,15 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
                     <p style={{ fontSize: '0.875rem' }}>输入消息与 Claude 进行交互</p>
                 </div>
             ) : (
-                groupedMessages.map((item) => {
+                groupedMessages.map((item, index) => {
                     if (typeof item === 'object' && 'type' in item && item.type === 'tool_group') {
-                        const isExpanded = expandedGroups.has(item.groupId);
+                        const uniqueId = `tool-${item.groupId}-${index}`;
+                        const isExpanded = expandedIds.has(uniqueId);
 
                         return (
-                            <div key={item.groupId} style={{ marginBottom: '0.5rem' }}>
-                                <details
-                                    open={isExpanded}
+                            <div key={uniqueId} style={{ marginBottom: '0.5rem' }}>
+                                <div
+                                    onClick={() => toggleGroup(uniqueId)}
                                     style={{
                                         background: 'var(--bg-secondary)',
                                         border: '1px solid var(--border-color)',
@@ -87,28 +88,22 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
                                         overflow: 'hidden',
                                     }}
                                 >
-                                    <summary
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            toggleGroup(item.groupId);
-                                        }}
-                                        style={{
-                                            padding: '0.5rem 1rem',
-                                            cursor: 'pointer',
-                                            userSelect: 'none',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.5rem',
-                                            fontSize: '0.875rem',
-                                            color: 'var(--text-secondary)',
-                                        }}
-                                    >
+                                    <div style={{
+                                        padding: '0.5rem 1rem',
+                                        cursor: 'pointer',
+                                        userSelect: 'none',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        fontSize: '0.875rem',
+                                        color: 'var(--text-secondary)',
+                                    }}>
                                         <span style={{ fontSize: '0.75rem' }}>
                                             {isExpanded ? '▼' : '▶'}
                                         </span>
                                         <Wrench size={14} style={{ color: 'var(--accent)' }} />
                                         <span>工具调用 ({item.tools.length})</span>
-                                    </summary>
+                                    </div>
                                     {isExpanded && (
                                         <div style={{
                                             padding: '0.5rem 1rem',
@@ -128,36 +123,41 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
                                                         padding: '0.5rem',
                                                     }}>
                                                         <div style={{
-                                                            fontWeight: 500,
-                                                            color: 'var(--accent)',
-                                                            marginBottom: '0.25rem',
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center',
                                                         }}>
-                                                            {tool.name}
+                                                            <div style={{
+                                                                fontWeight: 500,
+                                                                color: 'var(--accent)',
+                                                            }}>
+                                                                {tool.name}
+                                                            </div>
+                                                            {tool.status === 'pending' && (
+                                                                <span style={{ fontSize: '0.75rem', color: 'orange' }}>
+                                                                    ⏳ 执行中...
+                                                                </span>
+                                                            )}
+                                                            {tool.status === 'success' && (
+                                                                <span style={{ fontSize: '0.75rem', color: 'green' }}>
+                                                                    ✓ 完成
+                                                                </span>
+                                                            )}
+                                                            {tool.status === 'error' && (
+                                                                <span style={{ fontSize: '0.75rem', color: 'red' }}>
+                                                                    ✗ 失败
+                                                                </span>
+                                                            )}
                                                         </div>
                                                         {(tool.input as any) && (
                                                             <pre style={{
                                                                 fontSize: '0.75rem',
                                                                 overflow: 'auto',
                                                                 maxHeight: '100px',
-                                                                marginBottom: '0.25rem',
+                                                                marginTop: '0.25rem',
                                                             }}>
                                                                 {typeof tool.input === 'string' ? tool.input : JSON.stringify(tool.input, null, 2) as string}
                                                             </pre>
-                                                        )}
-                                                        {tool.status === 'pending' && (
-                                                            <div style={{ fontSize: '0.75rem', color: 'orange' }}>
-                                                                ⏳ 执行中...
-                                                            </div>
-                                                        )}
-                                                        {tool.status === 'success' && (
-                                                            <div style={{ fontSize: '0.75rem', color: 'green' }}>
-                                                                ✓ 完成 {tool.duration && `(${tool.duration}ms)`}
-                                                            </div>
-                                                        )}
-                                                        {tool.status === 'error' && (
-                                                            <div style={{ fontSize: '0.75rem', color: 'red' }}>
-                                                                ✗ 失败
-                                                            </div>
                                                         )}
                                                         {(tool.output as any) && (
                                                             <pre style={{
@@ -176,7 +176,7 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
                                             })}
                                         </div>
                                     )}
-                                </details>
+                                </div>
                             </div>
                         );
                     }
