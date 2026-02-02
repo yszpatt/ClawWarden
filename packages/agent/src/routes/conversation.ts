@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { conversationStorage } from '../services/conversation-storage';
 import { readGlobalConfig } from '../utils/json-store';
-import type { Conversation, ConversationMessage, AssistantMessage } from '@antiwarden/shared';
+import type { Conversation, ConversationMessage, AssistantMessage } from '@clawwarden/shared';
 
 export async function conversationRoutes(fastify: FastifyInstance) {
     // Get conversation for a task

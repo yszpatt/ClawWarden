@@ -9,8 +9,8 @@ import { agentManager } from '../services/agent-manager';
 import { worktreeManager } from '../services/worktree-manager';
 import { conversationStorage } from '../services/conversation-storage';
 import { getSchemaForLane, getOutputTypeForLane } from '../services/schemas';
-import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task, ToolCall, AssistantMessage } from '@antiwarden/shared';
-import { getLanePrompt } from '@antiwarden/shared';
+import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task, ToolCall, AssistantMessage } from '@clawwarden/shared';
+import { getLanePrompt } from '@clawwarden/shared';
 
 // Track running lane executions for stop functionality
 // Maps taskId to an abort controller or stop flag

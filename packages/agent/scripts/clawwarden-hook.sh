@@ -1,5 +1,5 @@
 #!/bin/bash
-# AntiWarden Hook Script for Claude Code
+# ClawWarden Hook Script for Claude Code
 # This script is called by Claude Code hooks to update task status
 #
 # Environment variables:
@@ -7,15 +7,15 @@
 #   ANTIWARDEN_API_URL - API base URL (optional, defaults to localhost:4001)
 #
 # Usage:
-#   antiwarden-hook.sh stop     - Called when user stops the task (Ctrl+C)
-#   antiwarden-hook.sh complete - Called when task completes normally
+#   clawwarden-hook.sh stop     - Called when user stops the task (Ctrl+C)
+#   clawwarden-hook.sh complete - Called when task completes normally
 
 set -e
 
 TASK_ID="${ANTIWARDEN_TASK_ID}"
 API_URL="${ANTIWARDEN_API_URL:-http://localhost:4001}"
 
-# Exit silently if not an AntiWarden task
+# Exit silently if not an ClawWarden task
 if [ -z "$TASK_ID" ]; then
     exit 0
 fi
@@ -23,7 +23,7 @@ fi
 HOOK_TYPE="${1:-stop}"
 
 log() {
-    echo "[AntiWarden Hook] $1" >&2
+    echo "[ClawWarden Hook] $1" >&2
 }
 
 case "$HOOK_TYPE" in

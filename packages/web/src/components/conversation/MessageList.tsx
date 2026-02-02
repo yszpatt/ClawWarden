@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Wrench } from 'lucide-react';
-import type { ConversationMessage, AssistantMessage } from '@antiwarden/shared';
+import type { ConversationMessage, AssistantMessage } from '@clawwarden/shared';
 import { MessageBubble } from './MessageBubble';
 
 interface MessageListProps {
@@ -14,9 +14,23 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
+    // Scroll to bottom when messages change or when component first mounts
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // Use immediate scroll on mount, smooth scroll during streaming
+        const scrollBehavior = messages.length > 0 ? 'smooth' : 'auto';
+        messagesEndRef.current?.scrollIntoView({ behavior: scrollBehavior as ScrollBehavior });
     }, [messages, isStreaming]);
+
+    // Also scroll on mount (for initial load)
+    useEffect(() => {
+        // Small delay to ensure DOM is rendered
+        const timeoutId = setTimeout(() => {
+            if (messages.length > 0) {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+            }
+        }, 50);
+        return () => clearTimeout(timeoutId);
+    }, []); // Run once on mount
 
     // Group consecutive tool calls with the same groupId
     const groupedMessages = messages.reduce<MessageGroup[]>((acc, message) => {
@@ -183,9 +197,8 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
                     return <MessageBubble key={item.id} message={item} />;
                 })
             )}
-            {isStreaming && (
-                <div ref={messagesEndRef} />
-            )}
+            {/* Scroll anchor - always rendered to enable scroll to bottom */}
+            <div ref={messagesEndRef} style={{ height: '1px' }} />
         </div>
     );
 }

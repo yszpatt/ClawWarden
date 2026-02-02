@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import type { Conversation, ConversationMessage } from '@antiwarden/shared';
+import type { Conversation, ConversationMessage } from '@clawwarden/shared';
 
 /**
  * File-based conversation storage

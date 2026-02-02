@@ -19,7 +19,7 @@ export function Header({ projectName, onBackToProjects, onSettingsClick }: Heade
                         ←
                     </button>
                 )}
-                <h1>AntiWarden</h1>
+                <h1>ClawWarden</h1>
             </div>
             <div className="header-actions">
                 {projectName && (

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { connectionManager } from '../services/ConnectionManager';
-import type { ConversationMessage, AssistantMessage, ToolCall } from '@antiwarden/shared';
+import type { ConversationMessage, AssistantMessage, ToolCall } from '@clawwarden/shared';
 import type { WsMessage } from '../services/ConnectionManager';
 import { fetchConversation, clearConversation as apiClearConversation } from '../api/conversation';
 

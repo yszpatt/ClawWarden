@@ -5,11 +5,11 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Path to the skills templates in the AntiWarden package
+// Path to the skills templates in the ClawWarden package
 const SKILLS_TEMPLATE_DIR = join(__dirname, '../../../../skills');
 
 /**
- * Install AntiWarden skills to a project's .agent/skills directory
+ * Install ClawWarden skills to a project's .agent/skills directory
  */
 export async function installSkills(projectPath: string): Promise<string[]> {
     const targetSkillsDir = join(projectPath, '.agent', 'skills');
@@ -69,7 +69,7 @@ async function copyDirectory(source: string, target: string): Promise<void> {
 }
 
 /**
- * Check if a project has AntiWarden skills installed
+ * Check if a project has ClawWarden skills installed
  */
 export function hasSkillsInstalled(projectPath: string): boolean {
     const skillsDir = join(projectPath, '.agent', 'skills');

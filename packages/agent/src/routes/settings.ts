@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { readGlobalConfig, writeGlobalConfig } from '../utils/json-store';
-import type { GlobalSettings } from '@antiwarden/shared';
+import type { GlobalSettings } from '@clawwarden/shared';
 import { hooksInstaller } from '../services/hooks-installer';
 
 export async function settingsRoutes(fastify: FastifyInstance) {

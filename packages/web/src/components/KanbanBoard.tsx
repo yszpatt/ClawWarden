@@ -1,4 +1,4 @@
-import type { Task, Lane } from '@antiwarden/shared';
+import type { Task, Lane } from '@clawwarden/shared';
 
 interface TaskCardProps {
     task: Task;

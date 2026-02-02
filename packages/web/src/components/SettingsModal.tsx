@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
-import type { GlobalSettings, ClaudeSettings, NotificationSettings } from '@antiwarden/shared';
-import { DEFAULT_SETTINGS, DEFAULT_LANES } from '@antiwarden/shared';
+import type { GlobalSettings, ClaudeSettings, NotificationSettings } from '@clawwarden/shared';
+import { DEFAULT_SETTINGS, DEFAULT_LANES } from '@clawwarden/shared';
 import { fetchSettings, updateSettings, fetchHooksStatus, installHooks, uninstallHooks } from '../api/settings';
 
 interface HooksStatus {

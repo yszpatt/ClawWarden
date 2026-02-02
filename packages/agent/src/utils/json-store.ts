@@ -1,8 +1,8 @@
 import { readFile, writeFile, mkdir } from 'fs/promises';
 import { existsSync } from 'fs';
 import { dirname } from 'path';
-import type { GlobalConfig, ProjectData } from '@antiwarden/shared';
-import { DEFAULT_LANES, DEFAULT_SETTINGS } from '@antiwarden/shared';
+import type { GlobalConfig, ProjectData } from '@clawwarden/shared';
+import { DEFAULT_LANES, DEFAULT_SETTINGS } from '@clawwarden/shared';
 import { GLOBAL_CONFIG_FILE, getProjectTasksFile } from './paths';
 
 export async function ensureDir(filePath: string): Promise<void> {

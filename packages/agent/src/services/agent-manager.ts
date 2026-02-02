@@ -1,12 +1,12 @@
 import { EventEmitter } from 'events';
 import { query, createSdkMcpServer, Options, McpSdkServerConfigWithInstance, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
-import type { TaskStatus } from '@antiwarden/shared';
+import type { TaskStatus } from '@clawwarden/shared';
 import { readFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 
-import type { ToolCall } from '@antiwarden/shared';
+import type { ToolCall } from '@clawwarden/shared';
 
 export interface AgentCallbacks {
     onLog: (message: string) => void;
@@ -293,11 +293,11 @@ export class AgentManager extends EventEmitter {
             };
 
             const antiWardenServer = createSdkMcpServer({
-                name: 'AntiWarden-Tools',
+                name: 'ClawWarden-Tools',
                 version: '1.0.0',
                 tools: [{
                     name: 'antiwarden_update',
-                    description: 'Update the status of the current task in AntiWarden. Use this when you start working, complete a task, or encounter a failure. You can also move the task to a different lane.',
+                    description: 'Update the status of the current task in ClawWarden. Use this when you start working, complete a task, or encounter a failure. You can also move the task to a different lane.',
                     inputSchema: z.object({
                         status: z.enum(['idle', 'running', 'completed', 'failed', 'pending-dev', 'pending-merge']).describe('The new status of the task.'),
                         moveTo: z.enum(['design', 'develop', 'test', 'pending-merge', 'archived']).optional().describe('Move the task to a new Kanban lane.'),

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { Task, StructuredOutput } from '@antiwarden/shared';
+import type { Task, StructuredOutput } from '@clawwarden/shared';
 import { useTerminalConnection, type TerminalRef } from './Terminal';
 import { ConversationPanel } from './conversation/ConversationPanel';
 import { StructuredOutputViewer } from './StructuredOutput';

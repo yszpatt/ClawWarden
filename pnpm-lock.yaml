@@ -24,7 +24,7 @@ importers:
       '@anthropic-ai/claude-agent-sdk':
         specifier: ^0.2.25
         version: 0.2.25(zod@4.3.6)
-      '@antiwarden/shared':
+      '@clawwarden/shared':
         specifier: workspace:*
         version: link:../shared
       '@fastify/cors':
@@ -66,7 +66,7 @@ importers:
 
   packages/web:
     dependencies:
-      '@antiwarden/shared':
+      '@clawwarden/shared':
         specifier: workspace:*
         version: link:../shared
       '@dnd-kit/core':

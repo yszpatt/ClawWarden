@@ -1,5 +1,5 @@
 {
-    "name": "@antiwarden/agent",
+    "name": "@clawwarden/agent",
     "version": "0.1.0",
     "type": "module",
     "main": "./dist/index.js",
@@ -10,7 +10,7 @@
     },
     "dependencies": {
         "@anthropic-ai/claude-agent-sdk": "^0.2.25",
-        "@antiwarden/shared": "workspace:*",
+        "@clawwarden/shared": "workspace:*",
         "@fastify/cors": "^8.4.0",
         "@fastify/websocket": "^8.3.0",
         "chokidar": "^3.5.3",

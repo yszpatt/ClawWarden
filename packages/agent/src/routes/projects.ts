@@ -4,7 +4,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { readGlobalConfig, writeGlobalConfig, initializeProject, readProjectData } from '../utils/json-store';
 import { installSkills } from '../services/skills-installer';
-import type { ProjectRef } from '@antiwarden/shared';
+import type { ProjectRef } from '@clawwarden/shared';
 
 const execAsync = promisify(exec);
 
@@ -32,7 +32,7 @@ async function ensureGitRepo(projectPath: string): Promise<void> {
         // Create initial commit with .gitignore
         await execAsync('echo "node_modules/\\n.antiwarden/\\n.worktrees/" > .gitignore', { cwd: projectPath });
         await execAsync('git add .gitignore', { cwd: projectPath });
-        await execAsync('git commit -m "Initial commit by AntiWarden"', { cwd: projectPath });
+        await execAsync('git commit -m "Initial commit by ClawWarden"', { cwd: projectPath });
         console.log('[Project] Git repository initialized with initial commit');
     } else {
         console.log('[Project] Project is already a git repository');
@@ -64,7 +64,7 @@ export async function projectRoutes(fastify: FastifyInstance) {
         // Auto-initialize git if not already a git repo
         await ensureGitRepo(path);
 
-        // Auto-install AntiWarden skills to the project
+        // Auto-install ClawWarden skills to the project
         const installedSkills = await installSkills(path);
         if (installedSkills.length > 0) {
             fastify.log.info(`Installed skills: ${installedSkills.join(', ')}`);

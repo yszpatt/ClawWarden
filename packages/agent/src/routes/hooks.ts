@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { readGlobalConfig, readProjectData, writeProjectData } from '../utils/json-store';
-import type { TaskStatus } from '@antiwarden/shared';
+import type { TaskStatus } from '@clawwarden/shared';
 
 /**
  * Hook routes for external triggers (e.g., Claude Code hooks)

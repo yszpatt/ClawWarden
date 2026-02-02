@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Task, ProjectRef, ProjectData } from '@antiwarden/shared';
+import type { Task, ProjectRef, ProjectData } from '@clawwarden/shared';
 import { batchUpdateTasks, updateTask as apiUpdateTask, deleteTask as apiDeleteTask, fetchProjectData } from '../api/projects';
 
 interface AppState {

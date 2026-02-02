@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AlertCircle, Info, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
-import type { ConversationMessage, AssistantMessage } from '@antiwarden/shared';
+import type { ConversationMessage, AssistantMessage } from '@clawwarden/shared';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
 
 interface MessageBubbleProps {

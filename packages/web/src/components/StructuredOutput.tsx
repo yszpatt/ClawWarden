@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { StructuredOutput, DesignOutput, DevelopmentOutput, TestingOutput } from '@antiwarden/shared';
+import type { StructuredOutput, DesignOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
 
 interface StructuredOutputProps {
     output: StructuredOutput;

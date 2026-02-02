@@ -3,7 +3,7 @@ const API_BASE = 'http://localhost:4001';
 import type {
     Conversation,
     ConversationMessage,
-} from '@antiwarden/shared';
+} from '@clawwarden/shared';
 
 export async function fetchConversation(
     projectId: string,

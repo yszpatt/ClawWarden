@@ -27,11 +27,11 @@ const CLAUDE_SETTINGS_PATH = path.join(CLAUDE_SETTINGS_DIR, 'settings.json');
 
 // Hook script installation path
 const HOOK_SCRIPT_DIR = path.join(os.homedir(), '.local', 'bin');
-const HOOK_SCRIPT_NAME = 'antiwarden-hook.sh';
+const HOOK_SCRIPT_NAME = 'clawwarden-hook.sh';
 const HOOK_SCRIPT_PATH = path.join(HOOK_SCRIPT_DIR, HOOK_SCRIPT_NAME);
 
 // Source script path (relative to this file when built)
-const SOURCE_SCRIPT_PATH = path.join(__dirname, '..', '..', 'scripts', 'antiwarden-hook.sh');
+const SOURCE_SCRIPT_PATH = path.join(__dirname, '..', '..', 'scripts', 'clawwarden-hook.sh');
 
 class HooksInstaller {
     /**
@@ -73,7 +73,7 @@ class HooksInstaller {
 
             return hooks.some((hook: any) =>
                 hook.hooks?.some((h: any) =>
-                    h.command?.includes('antiwarden-hook.sh')
+                    h.command?.includes('clawwarden-hook.sh')
                 )
             );
         } catch {
@@ -148,7 +148,7 @@ class HooksInstaller {
 
             // Remove existing antiwarden hooks and add new one
             settings.hooks.Stop = settings.hooks.Stop.filter(
-                (hook: any) => !hook.hooks?.some((h: any) => h.command?.includes('antiwarden-hook.sh'))
+                (hook: any) => !hook.hooks?.some((h: any) => h.command?.includes('clawwarden-hook.sh'))
             );
             settings.hooks.Stop.push(antiwardenStopHook);
 
@@ -218,7 +218,7 @@ class HooksInstaller {
 
             if (settings.hooks?.Stop) {
                 settings.hooks.Stop = settings.hooks.Stop.filter(
-                    (hook: any) => !hook.hooks?.some((h: any) => h.command?.includes('antiwarden-hook.sh'))
+                    (hook: any) => !hook.hooks?.some((h: any) => h.command?.includes('clawwarden-hook.sh'))
                 );
 
                 // Remove empty arrays

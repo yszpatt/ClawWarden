@@ -85,7 +85,7 @@ export class WorktreeManager {
             try {
                 await execAsync('test -f .gitignore || echo "node_modules/\n.antiwarden/\n.worktrees/" > .gitignore', { cwd: projectPath });
                 await execAsync('git add -A', { cwd: projectPath });
-                await execAsync('git commit --allow-empty -m "Initial commit by AntiWarden"', { cwd: projectPath });
+                await execAsync('git commit --allow-empty -m "Initial commit by ClawWarden"', { cwd: projectPath });
                 console.log('[WorktreeManager] Initial commit created');
             } catch (error: any) {
                 console.error('[WorktreeManager] Failed to create initial commit:', error.message);
@@ -212,7 +212,7 @@ export class WorktreeManager {
                     if (statusOutput.trim()) {
                         console.log(`[WorktreeManager] Found uncommitted changes, committing...`);
                         await execAsync('git add -A', { cwd: worktreePath });
-                        await execAsync('git commit -m "Task completed - auto commit by AntiWarden"', { cwd: worktreePath });
+                        await execAsync('git commit -m "Task completed - auto commit by ClawWarden"', { cwd: worktreePath });
                         console.log(`[WorktreeManager] Changes committed successfully`);
                     } else {
                         console.log(`[WorktreeManager] No uncommitted changes in worktree`);

@@ -1,4 +1,4 @@
-import { QUICK_ACTIONS } from '@antiwarden/shared';
+import { QUICK_ACTIONS } from '@clawwarden/shared';
 
 interface QuickActionsProps {
     onAction: (prompt: string) => void;
