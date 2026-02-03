@@ -73,17 +73,20 @@ export function ConversationPanel({
             }}>
                 <button
                     onClick={() => handleTabChange('conversation')}
-                    className="tab-button"
+                    className={`tab-button ${activeTab === 'conversation' ? 'active' : ''}`}
                     style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
-                        padding: '0.75rem 1rem',
+                        padding: '0.75rem 1.5rem',
                         fontSize: '0.875rem',
+                        fontWeight: activeTab === 'conversation' ? '600' : '400',
                         border: 'none',
+                        color: activeTab === 'conversation' ? 'var(--text-primary)' : 'var(--text-secondary)',
                         background: activeTab === 'conversation' ? 'var(--bg-card)' : 'transparent',
                         borderBottom: activeTab === 'conversation' ? '2px solid var(--accent)' : '2px solid transparent',
                         cursor: 'pointer',
+                        transition: 'all 0.2s ease',
                     }}
                 >
                     <MessageSquare size={16} />
@@ -91,17 +94,20 @@ export function ConversationPanel({
                 </button>
                 <button
                     onClick={() => handleTabChange('terminal')}
-                    className="tab-button"
+                    className={`tab-button ${activeTab === 'terminal' ? 'active' : ''}`}
                     style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
-                        padding: '0.75rem 1rem',
+                        padding: '0.75rem 1.5rem',
                         fontSize: '0.875rem',
+                        fontWeight: activeTab === 'terminal' ? '600' : '400',
                         border: 'none',
+                        color: activeTab === 'terminal' ? 'var(--text-primary)' : 'var(--text-secondary)',
                         background: activeTab === 'terminal' ? 'var(--bg-card)' : 'transparent',
                         borderBottom: activeTab === 'terminal' ? '2px solid var(--accent)' : '2px solid transparent',
                         cursor: 'pointer',
+                        transition: 'all 0.2s ease',
                     }}
                 >
                     <Terminal size={16} />

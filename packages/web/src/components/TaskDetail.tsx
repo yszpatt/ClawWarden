@@ -607,12 +607,12 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                     <label className="form-label">状态</label>
                     <span className={`task-status ${task.status}`}>{
                         task.status === 'idle' ? '待执行' :
-                        task.status === 'running' ? '执行中' :
-                        task.status === 'completed' ? '已完成' :
-                        task.status === 'failed' ? '失败' :
-                        task.status === 'pending-dev' ? '待开发' :
-                        task.status === 'pending-merge' ? '待合并' :
-                        task.status
+                            task.status === 'running' ? '执行中' :
+                                task.status === 'completed' ? '已完成' :
+                                    task.status === 'failed' ? '失败' :
+                                        task.status === 'pending-dev' ? '待开发' :
+                                            task.status === 'pending-merge' ? '待合并' :
+                                                task.status
                     }</span>
                 </div>
 
@@ -628,9 +628,9 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                         <label className="form-label">Claude Session</label>
                         <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
                             <div>ID: {task.claudeSession.id}</div>
-                            <div style={{ color: 'var(--text-secondary)' }}>Created: {new Date(task.claudeSession.createdAt).toLocaleString()}</div>
+                            <div style={{ color: 'var(--text-primary)', opacity: 0.7 }}>Created: {new Date(task.claudeSession.createdAt).toLocaleString()}</div>
                             <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
-                                <div style={{ color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Resume in terminal:</div>
+                                <div style={{ color: 'var(--text-primary)', opacity: 0.7, marginBottom: '0.25rem' }}>Resume in terminal:</div>
                                 <div style={{ background: 'var(--bg-secondary)', padding: '0.25rem 0.5rem', borderRadius: '2px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                     <code style={{ color: 'var(--accent-color)' }}>cd {task.worktree ? task.worktree.path : 'project-path'} && claude -r {task.claudeSession.id}</code>
                                 </div>
@@ -647,8 +647,8 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                         <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', background: task.worktree.removedAt ? 'var(--bg-secondary)' : 'var(--bg-tertiary)', color: 'var(--text-primary)', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', opacity: task.worktree.removedAt ? 0.7 : 1 }}>
                             <div>Path: {task.worktree.path}</div>
                             <div>Branch: {task.worktree.branch}</div>
-                            <div>Created: {new Date(task.worktree.createdAt).toLocaleString()}</div>
-                            {task.worktree.removedAt && <div style={{ color: '#EF4444' }}>Removed: {new Date(task.worktree.removedAt).toLocaleString()}</div>}
+                            <div style={{ opacity: 0.8 }}>Created: {new Date(task.worktree.createdAt).toLocaleString()}</div>
+                            {task.worktree.removedAt && <div style={{ color: '#EF4444', opacity: 0.9 }}>Removed: {new Date(task.worktree.removedAt).toLocaleString()}</div>}
                         </div>
                     </div>
                 )}

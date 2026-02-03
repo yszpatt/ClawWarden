@@ -49,7 +49,7 @@ export function StructuredOutputViewer({ output }: StructuredOutputProps) {
                     }}>
                         {output.type}
                     </span>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)', opacity: 0.8 }}>
                         {new Date(output.timestamp).toLocaleString()}
                     </span>
                 </div>
@@ -137,12 +137,12 @@ function renderDesignOutput(data: DesignOutput) {
                                 <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
                                     {component.name}
                                 </div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', opacity: 0.8, marginTop: '0.25rem' }}>
                                     {component.description}
                                 </div>
                                 {component.files && component.files.length > 0 && (
                                     <div style={{ marginTop: '0.5rem' }}>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>文件:</div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)', opacity: 0.6 }}>文件:</div>
                                         {component.files.map((file, fIdx) => (
                                             <code key={fIdx} style={{
                                                 display: 'inline-block',
@@ -252,8 +252,8 @@ function renderDevelopmentOutput(data: DevelopmentOutput) {
                                 }}>
                                     {change.action}
                                 </span>
-                                <code style={{ fontSize: '0.85rem', color: 'var(--accent)' }}>{change.file}</code>
-                                <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{change.description}</span>
+                                <code style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: '500' }}>{change.file}</code>
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{change.description}</span>
                             </div>
                         ))}
                     </div>
