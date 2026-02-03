@@ -2,6 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import { v4 as uuid } from 'uuid';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { join } from 'path';
+import * as fs from 'fs';
 import { readGlobalConfig, writeGlobalConfig, initializeProject, readProjectData } from '../utils/json-store';
 import { installSkills } from '../services/skills-installer';
 import type { ProjectRef } from '@clawwarden/shared';
@@ -51,6 +53,11 @@ export async function projectRoutes(fastify: FastifyInstance) {
         const { name, path } = request.body;
         const config = await readGlobalConfig();
 
+        // Check if project is already registered
+        if (config.projects.find(p => p.path === path)) {
+            throw { statusCode: 400, message: 'Project already registered' };
+        }
+
         const project: ProjectRef = {
             id: uuid(),
             name,
@@ -59,12 +66,21 @@ export async function projectRoutes(fastify: FastifyInstance) {
             lastOpenedAt: new Date().toISOString(),
         };
 
-        await initializeProject(path, project.id);
+        const configPath = join(path, '.clawwarden');
+        const isExisting = fs.existsSync(configPath);
 
-        // Auto-initialize git if not already a git repo
-        await ensureGitRepo(path);
+        if (!isExisting) {
+            console.log('[Project] New project detected, initializing...');
+            await initializeProject(path, project.id);
+            // Auto-initialize git if not already a git repo
+            await ensureGitRepo(path);
+        } else {
+            console.log('[Project] Existing project detected, importing...');
+            // Maybe we should update the projectId in tasks.json if it doesn't match?
+            // For now, assume it's fine.
+        }
 
-        // Auto-install ClawWarden skills to the project
+        // Auto-install/update ClawWarden skills to the project
         const installedSkills = await installSkills(path);
         if (installedSkills.length > 0) {
             fastify.log.info(`Installed skills: ${installedSkills.join(', ')}`);

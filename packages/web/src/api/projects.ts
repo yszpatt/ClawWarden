@@ -30,6 +30,13 @@ export async function createProject(name: string, path: string): Promise<Project
     return res.json();
 }
 
+export async function deleteProject(projectId: string): Promise<void> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}`, {
+        method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete project');
+}
+
 export async function fetchProjectData(projectId: string): Promise<{ project: ProjectRef; data: ProjectData }> {
     const res = await fetch(`${API_BASE}/api/projects/${projectId}`);
     if (!res.ok) throw new Error('Failed to fetch project data');
@@ -137,5 +144,13 @@ export async function mergeWorktree(
         const error = await res.json().catch(() => ({ message: 'Failed to merge worktree' }));
         throw new Error(error.message);
     }
+    return res.json();
+}
+
+export async function fetchFsList(path?: string): Promise<any> {
+    const url = new URL(`${API_BASE}/api/fs/list`);
+    if (path) url.searchParams.set('path', path);
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error('Failed to fetch filesystem list');
     return res.json();
 }

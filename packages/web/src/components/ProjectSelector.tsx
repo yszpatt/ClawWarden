@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { ProjectRef } from '../api/projects';
-import { fetchProjects, createProject } from '../api/projects';
+import { fetchProjects, createProject, deleteProject } from '../api/projects';
 import { SettingsModal } from './SettingsModal';
+import { FolderPicker } from './FolderPicker';
 
 interface ProjectSelectorProps {
     onSelectProject: (project: ProjectRef) => void;
@@ -16,6 +17,7 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
     const [newPath, setNewPath] = useState('');
     const [creating, setCreating] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
+    const [showFolderPicker, setShowFolderPicker] = useState(false);
 
     useEffect(() => {
         loadProjects();
@@ -40,6 +42,16 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
         }
     };
 
+    const handlePathSelect = (path: string) => {
+        setNewPath(path);
+        // If name is empty, pre-fill with folder name
+        if (!newName.trim()) {
+            const folderName = path.split('/').filter(Boolean).pop() || '';
+            setNewName(folderName);
+        }
+        setShowFolderPicker(false);
+    };
+
     const handleCreate = async () => {
         if (!newName.trim() || !newPath.trim()) return;
 
@@ -55,6 +67,21 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
             setError(err instanceof Error ? err.message : '创建项目失败');
         } finally {
             setCreating(false);
+        }
+    };
+
+    const handleRemoveProject = async (e: React.MouseEvent, projectId: string) => {
+        e.stopPropagation(); // Avoid selecting the project
+
+        if (!confirm('确定要将此项目从列表中移除吗？\n(项目文件将保留在磁盘上)')) {
+            return;
+        }
+
+        try {
+            await deleteProject(projectId);
+            setProjects(projects.filter(p => p.id !== projectId));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '移除项目失败');
         }
     };
 
@@ -82,7 +109,7 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
                     <div className="section-title">
                         <h2>选择项目</h2>
                         <button className="new-project-btn" onClick={() => setShowNewForm(true)}>
-                            + 新建项目
+                            + 新建/导入项目
                         </button>
                     </div>
 
@@ -106,6 +133,13 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
                                         <h3>{project.name}</h3>
                                         <span className="project-path">{project.path}</span>
                                     </div>
+                                    <button
+                                        className="remove-project-btn"
+                                        onClick={(e) => handleRemoveProject(e, project.id)}
+                                        title="从列表中移除"
+                                    >
+                                        🗑️
+                                    </button>
                                     <div className="project-arrow">→</div>
                                 </div>
                             ))}
@@ -113,10 +147,10 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
                     )}
                 </div>
 
-                {showNewForm && (
+                {showNewForm && !showFolderPicker && (
                     <div className="modal-overlay" onClick={() => setShowNewForm(false)}>
                         <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                            <h2>新建项目</h2>
+                            <h2>新建/导入项目</h2>
                             <div className="form-group">
                                 <label className="form-label">项目名称</label>
                                 <input
@@ -129,13 +163,21 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">项目路径</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="/path/to/project"
-                                    value={newPath}
-                                    onChange={(e) => setNewPath(e.target.value)}
-                                />
+                                <div className="input-with-action">
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="/path/to/project"
+                                        value={newPath}
+                                        onChange={(e) => setNewPath(e.target.value)}
+                                    />
+                                    <button
+                                        className="browse-btn"
+                                        onClick={() => setShowFolderPicker(true)}
+                                    >
+                                        浏览...
+                                    </button>
+                                </div>
                             </div>
                             <div className="modal-actions">
                                 <button className="cancel-btn" onClick={() => setShowNewForm(false)}>
@@ -146,9 +188,22 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
                                     onClick={handleCreate}
                                     disabled={creating || !newName.trim() || !newPath.trim()}
                                 >
-                                    {creating ? '创建中...' : '创建'}
+                                    {creating ? '正在处理...' : '确认'}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {showFolderPicker && (
+                    <div className="modal-overlay" onClick={() => setShowFolderPicker(false)}>
+                        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                            <h2>选择项目文件夹</h2>
+                            <FolderPicker
+                                onSelect={handlePathSelect}
+                                onCancel={() => setShowFolderPicker(false)}
+                                initialPath={newPath}
+                            />
                         </div>
                     </div>
                 )}
