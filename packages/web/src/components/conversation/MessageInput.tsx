@@ -45,25 +45,19 @@ export function MessageInput({
     return (
         <div className="message-input" style={{
             borderTop: '1px solid var(--border-color)',
-            padding: '1rem',
+            padding: '1rem 1.5rem',
         }}>
-            {/* Quick action buttons */}
+            {/* Action buttons (Regenerate, Clear/Stop) */}
             <div style={{
                 display: 'flex',
                 gap: '0.5rem',
-                marginBottom: '0.75rem',
+                marginBottom: '1rem',
             }}>
                 <button
                     onClick={onRegenerate}
                     disabled={isStreaming}
-                    className="secondary-btn"
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.25rem',
-                        fontSize: '0.75rem',
-                        padding: '0.25rem 0.5rem',
-                    }}
+                    className="btn-unified secondary"
+                    style={{ fontSize: '0.75rem', padding: '0.375rem 0.75rem' }}
                     title="重新生成"
                 >
                     <RotateCcw size={14} />
@@ -72,14 +66,8 @@ export function MessageInput({
                 {isStreaming ? (
                     <button
                         onClick={onStop}
-                        className="danger-btn"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            fontSize: '0.75rem',
-                            padding: '0.25rem 0.5rem',
-                        }}
+                        className="btn-unified danger"
+                        style={{ fontSize: '0.75rem', padding: '0.375rem 0.75rem' }}
                         title="停止"
                     >
                         <Square size={14} />
@@ -88,14 +76,8 @@ export function MessageInput({
                 ) : (
                     <button
                         onClick={onClear}
-                        className="secondary-btn"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem',
-                            fontSize: '0.75rem',
-                            padding: '0.25rem 0.5rem',
-                        }}
+                        className="btn-unified ghost"
+                        style={{ fontSize: '0.75rem', padding: '0.375rem 0.75rem' }}
                         title="清除历史"
                     >
                         <Trash2 size={14} />
@@ -107,7 +89,7 @@ export function MessageInput({
             {/* Input area */}
             <div style={{
                 display: 'flex',
-                gap: '0.5rem',
+                gap: '0.75rem',
                 alignItems: 'flex-end',
             }}>
                 <textarea
@@ -115,34 +97,33 @@ export function MessageInput({
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="输入消息... (按 Enter 发送, Shift+Enter 换行)"
+                    placeholder="输入消息... (Enter 发送)"
                     disabled={disabled}
                     style={{
                         flex: 1,
                         minHeight: '44px',
                         maxHeight: '120px',
-                        padding: '0.75rem',
+                        padding: '0.75rem 1rem',
                         border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
+                        borderRadius: '12px',
                         background: 'var(--bg-card)',
                         color: 'var(--text-primary)',
                         fontSize: '0.875rem',
                         resize: 'none',
                         fontFamily: 'inherit',
+                        lineHeight: '1.5',
+                        outline: 'none',
                     }}
                 />
                 <button
                     onClick={handleSend}
                     disabled={disabled || !input.trim()}
-                    className="primary-btn"
+                    className="btn-unified primary"
                     style={{
                         width: '44px',
                         height: '44px',
                         padding: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        borderRadius: '8px',
+                        borderRadius: '12px',
                     }}
                     title="发送 (Enter)"
                 >

@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Task, StructuredOutput } from '@clawwarden/shared';
+import { Square, Save, X, Trash2, GitMerge, Palette, Edit2, Info, Database, GitBranch, Code2, ShieldCheck } from 'lucide-react';
 import { useTerminalConnection, type TerminalRef } from './Terminal';
 import { ConversationPanel } from './conversation/ConversationPanel';
-import { StructuredOutputViewer } from './StructuredOutput';
 import { useAppStore } from '../stores/appStore';
-import { fetchDesign, updateDesign, mergeWorktree, fetchProjectData, fetchTask } from '../api/projects';
+import { fetchDesign, updateDesign, mergeWorktree, fetchProjectData, fetchTask, fetchTaskSummary } from '../api/projects';
 import { connectionManager } from '../services/ConnectionManager';
+import { DEFAULT_LANES } from '@clawwarden/shared';
+
+const getLaneColor = (laneId: string) => {
+    return DEFAULT_LANES.find(l => l.id === laneId)?.color || 'var(--accent)';
+};
 
 interface TaskDetailProps {
     task: Task;
@@ -17,35 +22,28 @@ interface TaskDetailProps {
 export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDetailProps) {
     const isRunning = task.status === 'running';
     const [isRunningState, setIsRunningState] = useState(isRunning);
-    // Ref to track current task status for auto-attach callback
     const taskStatusRef = useRef(task.status);
     const [isGeneratingDesign, setIsGeneratingDesign] = useState(false);
     const [designContent, setDesignContent] = useState<string | null>(null);
     const [isEditingDesign, setIsEditingDesign] = useState(false);
     const [editedDesignContent, setEditedDesignContent] = useState('');
     const [isMerging, setIsMerging] = useState(false);
-    const [structuredOutput, setStructuredOutput] = useState<StructuredOutput | null>(task.structuredOutput || null);
-    const [activeTab, setActiveTab] = useState<'conversation' | 'terminal'>('conversation');
-
-    // Store the latest fetched task data (including claudeSession which may be updated by backend)
+    const [structuredOutputs, setStructuredOutputs] = useState<StructuredOutput[]>([]);
+    const [activeTab, setActiveTab] = useState<'conversation' | 'terminal' | 'design' | 'summary'>('conversation');
     const [fetchedTask, setFetchedTask] = useState<Task | null>(null);
-
-    // Sync task prop changes to fetchedTask (handles status updates from WebSocket)
-    useEffect(() => {
-        // Merge task prop with existing fetchedTask to preserve fields like claudeSession
-        setFetchedTask(prev => {
-            const base = prev || task;
-            return {
-                ...base,
-                status: task.status,
-                laneId: task.laneId,
-                updatedAt: task.updatedAt,
-            };
-        });
-    }, [task.status, task.laneId, task.updatedAt]);
-
-    // Create a ref object for the terminal
     const terminalRef = useRef<TerminalRef>(null);
+
+    const { updateTask, removeTask, setProjectData, currentProject } = useAppStore();
+
+    // Sync task prop changes to fetchedTask
+    useEffect(() => {
+        setFetchedTask(prev => ({
+            ...(prev || task),
+            status: task.status,
+            laneId: task.laneId,
+            updatedAt: task.updatedAt,
+        }));
+    }, [task.status, task.laneId, task.updatedAt]);
 
     const {
         connect,
@@ -56,8 +54,7 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         setTerminalRef,
         handleResize
     } = useTerminalConnection(projectId, task.id, {
-        onDesignComplete: (content, _designPath) => {
-            console.log('[TaskDetail] Design complete, setting content');
+        onDesignComplete: (content) => {
             setDesignContent(content);
             setEditedDesignContent(content);
             setIsGeneratingDesign(false);
@@ -66,12 +63,10 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
             onStatusChange?.(status as Task['status']);
         },
         onStructuredOutput: (output) => {
-            console.log('[TaskDetail] Structured output received:', output);
-            setStructuredOutput(output as StructuredOutput);
+            setStructuredOutputs(prev => [...prev, output as StructuredOutput]);
         }
     });
 
-    // Memoize handlers for ConversationPanel to prevent re-renders
     const handleTerminalData = useCallback((data: string) => {
         sendInput(data);
     }, [sendInput]);
@@ -80,191 +75,66 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         handleResize(cols, rows);
     }, [handleResize]);
 
-    // Sync terminalRef with setTerminalRef
     useEffect(() => {
-        if (terminalRef.current) {
-            setTerminalRef(terminalRef.current);
-        }
+        if (terminalRef.current) setTerminalRef(terminalRef.current);
     }, [terminalRef.current, setTerminalRef]);
 
-    // Sync running state
     useEffect(() => {
         setIsRunningState(task.status === 'running');
-        // Update ref to always have current status
         taskStatusRef.current = task.status;
     }, [task.status]);
 
-    // Sync structured output from task
-    useEffect(() => {
-        setStructuredOutput(task.structuredOutput || null);
-    }, [task.structuredOutput]);
-
-    // Fetch fresh task data on mount to get latest structured output and session info
     useEffect(() => {
         fetchTask(projectId, task.id)
             .then(result => {
-                console.log('[TaskDetail] Fetched fresh task data:', result.task);
-                // Store the complete fetched task (including claudeSession, status, etc.)
                 if (result.task) {
                     setFetchedTask(result.task);
-                    if (result.task.structuredOutput) {
-                        setStructuredOutput(result.task.structuredOutput);
-                    }
                 }
             })
-            .catch(err => {
-                console.log('[TaskDetail] Failed to fetch task data:', err);
-            });
+            .catch(err => console.log('[TaskDetail] Fetch error:', err));
     }, [projectId, task.id]);
 
-    // Load design content if exists
+    // Fetch summary on tab change to 'summary'
     useEffect(() => {
-        const taskToUse = fetchedTask || task;
-        if (taskToUse.designPath) {
-            console.log('[TaskDetail] Loading design content for task:', task.id, 'designPath:', taskToUse.designPath);
-            fetchDesign(projectId, task.id)
-                .then(result => {
-                    console.log('[TaskDetail] Design content loaded, length:', result.content?.length || 0);
-                    setDesignContent(result.content);
-                    setEditedDesignContent(result.content);
+        if (activeTab === 'summary') {
+            fetchTaskSummary(projectId, task.id)
+                .then(summaryResult => {
+                    if (summaryResult.summary) {
+                        const summary = Array.isArray(summaryResult.summary) ? summaryResult.summary : [summaryResult.summary];
+                        setStructuredOutputs(summary);
+                    }
                 })
-                .catch(err => {
-                    console.log('[TaskDetail] Failed to load design content:', err);
-                    setDesignContent(null);
-                });
-        } else {
-            console.log('[TaskDetail] No designPath, skipping design content load');
-            setDesignContent(null);
+                .catch(err => console.log('[TaskDetail] Summary fetch error:', err));
         }
-    }, [task.designPath, projectId, task.id, fetchedTask?.designPath]);
+    }, [projectId, task.id, activeTab]);
 
-    // Connect terminal on mount
     useEffect(() => {
-        return () => {
-            disconnect();
-        };
-    }, []);
-
-    // Handle conversation.design_complete message
-    useEffect(() => {
-        const handleDesignComplete = (message: any) => {
-            if (message.type === 'conversation.design_complete' && message.taskId === task.id) {
-                console.log('[TaskDetail] Design complete received, designPath:', message.designPath);
-                setIsGeneratingDesign(false);
-                onStatusChange?.('pending-dev');
-
-                // Reload task data to get updated design path
-                fetchTask(projectId, task.id)
-                    .then(result => {
-                        if (result.task?.designPath) {
-                            return fetchDesign(projectId, task.id);
-                        }
-                    })
-                    .then(result => {
-                        if (result?.content) {
-                            setDesignContent(result.content);
-                            setEditedDesignContent(result.content);
-                        }
-                    })
-                    .catch(err => {
-                        console.log('[TaskDetail] Failed to load design after completion:', err);
-                    });
-            }
-        };
-
-        connectionManager.subscribe(task.id, handleDesignComplete);
-        return () => {
-            // Note: ConnectionManager doesn't support direct unsubscribe
-            // but the handler will be filtered by taskId check
-        };
-    }, [task.id, projectId, onStatusChange]);
-
-    // Auto-attach to existing session when task is running OR has a historical session
-    useEffect(() => {
-        let cancelOnReady: (() => void) | null = null;
-
-        // Use fetchedTask if available (has latest data from backend), otherwise use prop task
-        const taskToCheck = fetchedTask || task;
-        const shouldAttach = taskToCheck.status === 'running' || taskToCheck.claudeSession;
-
-        console.log('[TaskDetail] Auto-attach effect:', {
-            taskId: task.id,
-            propStatus: task.status,
-            fetchedStatus: fetchedTask?.status,
-            propHasSession: !!task.claudeSession,
-            fetchedHasSession: !!fetchedTask?.claudeSession,
-            sessionId: taskToCheck.claudeSession?.id,
-            shouldAttach
-        });
-
-        if (shouldAttach) {
-            console.log('[TaskDetail] Calling connect()...');
-            cancelOnReady = connect(() => {
-                console.log('[TaskDetail] onReady callback fired, calling attach()');
-                attach();
-            });
-            console.log('[TaskDetail] connect() returned, cancelOnReady:', !!cancelOnReady);
-        } else {
-            console.log('[TaskDetail] Skipping attach, shouldAttach:', shouldAttach);
+        const t = fetchedTask || task;
+        if (t.designPath) {
+            fetchDesign(projectId, task.id)
+                .then(r => {
+                    setDesignContent(r.content);
+                    setEditedDesignContent(r.content);
+                })
+                .catch(err => console.log('[TaskDetail] Design load error:', err));
         }
+    }, [projectId, task.id, fetchedTask?.designPath]);
 
-        return () => {
-            if (cancelOnReady) {
-                console.log('[TaskDetail] Cleanup: canceling onReady callback');
-                cancelOnReady();
-            }
-        };
-    }, [task.id, task.status, task.claudeSession?.id, fetchedTask?.status, fetchedTask?.claudeSession?.id]);
+    useEffect(() => () => disconnect(), []);
 
-    const handleGenerateDesign = async () => {
+    const handleGenerateDesign = () => {
         if (isGeneratingDesign) return;
-
         setIsGeneratingDesign(true);
-        setActiveTab('conversation');  // Switch to conversation tab
-
-        // Ensure WebSocket is connected
+        setActiveTab('conversation');
         connectionManager.connect();
-
-        // Send conversation.design_start message
-        connectionManager.send({
-            type: 'conversation.design_start',
-            taskId: task.id,
-            projectId,
-        });
-
-        console.log('[TaskDetail] Sent conversation.design_start message');
-    };
-
-    const handleSaveDesign = async () => {
-        try {
-            await updateDesign(projectId, task.id, editedDesignContent);
-            setDesignContent(editedDesignContent);
-            setIsEditingDesign(false);
-        } catch (error: any) {
-            alert(`保存设计方案失败: ${error.message}`);
-        }
+        connectionManager.send({ type: 'conversation.design_start', taskId: task.id, projectId });
     };
 
     const handleExecute = () => {
-        if (!task.prompt && !task.designPath) {
-            alert('任务没有 Prompt 或设计方案，无法执行');
-            return;
-        }
-
-        // Switch to conversation tab
+        if (!task.prompt && !task.designPath) return alert('任务没有 Prompt 或设计方案，无法执行');
         setActiveTab('conversation');
-
-        // Ensure WebSocket is connected
         connectionManager.connect();
-
-        // Send conversation.execute_start message
-        connectionManager.send({
-            type: 'conversation.execute_start',
-            taskId: task.id,
-            projectId,
-        });
-
-        console.log('[TaskDetail] Sent conversation.execute_start message for lane:', task.laneId);
+        connectionManager.send({ type: 'conversation.execute_start', taskId: task.id, projectId });
     };
 
     const handleStop = () => {
@@ -273,21 +143,15 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         onStatusChange?.('idle');
     };
 
-    const { updateTask, removeTask, setProjectData, currentProject } = useAppStore();
-
     const handleMerge = async () => {
         if (isMerging || !task.worktree) return;
-
         setIsMerging(true);
         try {
             const result = await mergeWorktree(projectId, task.id);
-            if (result.success) {
-                // Refresh project data to update task state
-                if (currentProject) {
-                    const { data } = await fetchProjectData(currentProject.id);
-                    setProjectData(data);
-                }
-            } else {
+            if (result.success && currentProject) {
+                const { data } = await fetchProjectData(currentProject.id);
+                setProjectData(data);
+            } else if (!result.success) {
                 alert(`合并失败: ${result.message}`);
             }
         } catch (error: any) {
@@ -296,6 +160,7 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
             setIsMerging(false);
         }
     };
+
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({
         title: task.title,
@@ -303,24 +168,9 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         prompt: task.prompt || ''
     });
 
-    // Sync form with task when not editing
-    useEffect(() => {
-        if (!isEditing) {
-            setEditForm({
-                title: task.title,
-                description: task.description,
-                prompt: task.prompt || ''
-            });
-        }
-    }, [task, isEditing]);
-
     const handleSave = async () => {
         try {
-            await updateTask(task.id, {
-                title: editForm.title,
-                description: editForm.description,
-                prompt: editForm.prompt
-            });
+            await updateTask(task.id, editForm);
             setIsEditing(false);
         } catch (error) {
             alert('Failed to update task');
@@ -328,15 +178,9 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     };
 
     const handleDelete = async () => {
-        const hasWorktree = !!task.worktree;
-        const message = hasWorktree
-            ? `确定要删除此任务吗？\n\n此操作将同时删除关联的 Worktree:\n${task.worktree?.path}\n\n⚠️ 此操作不可撤销！`
-            : '确定要删除此任务吗？\n\n⚠️ 此操作不可撤销！';
-
-        if (confirm(message)) {
+        if (confirm('确定要删除此任务吗？⚠️ 此操作不可撤销！')) {
             try {
                 await removeTask(task.id);
-                // Sidebar close is handled by store but let's be safe
                 if (onClose) onClose();
             } catch (error) {
                 alert('删除任务失败');
@@ -344,309 +188,210 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         }
     };
 
-    // 根据泳道显示不同的操作按钮
-    const renderActionButtons = () => {
+    const renderMainActionButton = () => {
         const laneId = task.laneId;
+        const themeColor = getLaneColor(laneId);
 
         if (laneId === 'design') {
-            // 设计泳道：显示"开始设计"或设计状态
-            if (task.status === 'idle') {
-                return (
-                    <button
-                        className="primary-btn"
-                        onClick={handleGenerateDesign}
-                        disabled={isGeneratingDesign}
-                    >
-                        {isGeneratingDesign ? '⏳ 正在生成设计方案...' : '🎨 开始设计'}
-                    </button>
-                );
-            } else if (task.status === 'running') {
-                return (
-                    <button className="primary-btn" disabled>
-                        ⏳ 正在生成设计方案...
-                    </button>
-                );
-            } else if (task.status === 'failed') {
-                return (
-                    <button
-                        className="primary-btn"
-                        onClick={handleGenerateDesign}
-                        disabled={isGeneratingDesign}
-                        style={{ background: '#F59E0B' }}
-                    >
-                        {isGeneratingDesign ? '⏳ 正在生成...' : '🔄 重新生成设计'}
-                    </button>
-                );
-            }
-        } else if (laneId === 'develop' || laneId === 'test') {
-            // 开发/测试泳道：显示执行按钮
-            if (!isRunningState) {
-                const isFailed = task.status === 'failed';
-                const canExecute = task.prompt || task.designPath;
-                return (
-                    <button
-                        className="primary-btn"
-                        onClick={handleExecute}
-                        disabled={!canExecute}
-                        style={isFailed ? { background: '#F59E0B' } : undefined}
-                    >
-                        {isFailed ? '🔄 重试执行' : '▶ 开始执行'}
-                    </button>
-                );
-            } else {
-                return (
-                    <button
-                        className="primary-btn"
-                        onClick={handleStop}
-                        style={{ background: '#EF4444' }}
-                    >
-                        ■ 停止
-                    </button>
-                );
-            }
-        } else if (laneId === 'pending-merge') {
             return (
                 <button
-                    className="primary-btn"
-                    style={{ background: '#F59E0B' }}
-                    onClick={handleMerge}
-                    disabled={isMerging || !task.worktree}
+                    className="btn-unified primary"
+                    onClick={handleGenerateDesign}
+                    disabled={isGeneratingDesign}
+                    style={{ width: '100%', padding: '0.75rem', background: themeColor, borderColor: themeColor }}
                 >
-                    {isMerging ? '⏳ 正在合并...' : '🔀 合并到主分支'}
+                    <Palette size={16} />
+                    {isGeneratingDesign ? '正在生成设计方案...' : '生成设计方案'}
                 </button>
             );
-        } else if (laneId === 'archived') {
+        }
+        if (laneId === 'develop' || laneId === 'test') {
+            if (isRunningState) {
+                return (
+                    <button className="btn-unified danger" onClick={handleStop} style={{ width: '100%', padding: '0.75rem' }}>
+                        <Square size={16} fill="currentColor" />
+                        停止执行
+                    </button>
+                );
+            }
             return (
-                <span className="status-badge">📁 已归档</span>
+                <button
+                    className="btn-unified primary"
+                    onClick={handleExecute}
+                    disabled={!task.prompt && !task.designPath}
+                    style={{ width: '100%', padding: '0.75rem', background: themeColor, borderColor: themeColor }}
+                >
+                    {laneId === 'test' ? <ShieldCheck size={16} /> : <Code2 size={16} />}
+                    {task.status === 'failed' ? '重新执行任务' : laneId === 'test' ? '开始自动化测试' : '进入自动化开发'}
+                </button>
             );
         }
-
+        if (laneId === 'pending-merge') {
+            return (
+                <button
+                    className="btn-unified primary"
+                    onClick={handleMerge}
+                    disabled={isMerging || !task.worktree}
+                    style={{ width: '100%', padding: '0.75rem', background: themeColor, borderColor: themeColor }}
+                >
+                    <GitMerge size={16} />
+                    {isMerging ? '正在合并到主分支...' : '合并到主分支 (Main)'}
+                </button>
+            );
+        }
         return null;
     };
-
-    // 渲染设计方案预览
-    const renderDesignPreview = () => {
-        const taskToUse = fetchedTask || task;
-        if (!taskToUse.designPath && !designContent) return null;
-
-        return (
-            <div className="form-group" style={{ marginTop: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <label className="form-label">设计方案</label>
-                    {!isEditingDesign ? (
-                        <button
-                            className="secondary-btn"
-                            onClick={() => setIsEditingDesign(true)}
-                            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                        >
-                            编辑
-                        </button>
-                    ) : (
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button
-                                className="primary-btn"
-                                onClick={handleSaveDesign}
-                                style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                            >
-                                保存
-                            </button>
-                            <button
-                                className="secondary-btn"
-                                onClick={() => {
-                                    setIsEditingDesign(false);
-                                    setEditedDesignContent(designContent || '');
-                                }}
-                                style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                            >
-                                取消
-                            </button>
-                        </div>
-                    )}
-                </div>
-                {isEditingDesign ? (
-                    <textarea
-                        className="form-textarea"
-                        value={editedDesignContent}
-                        onChange={e => setEditedDesignContent(e.target.value)}
-                        style={{
-                            minHeight: '300px',
-                            fontFamily: 'monospace',
-                            fontSize: '0.75rem',
-                            whiteSpace: 'pre-wrap'
-                        }}
-                    />
-                ) : (
-                    <div
-                        className="design-preview"
-                        style={{
-                            background: 'var(--bg-card)',
-                            color: 'var(--text-primary)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '8px',
-                            padding: '1rem',
-                            maxHeight: '400px',
-                            overflow: 'auto',
-                            fontFamily: 'monospace',
-                            fontSize: '0.75rem',
-                            whiteSpace: 'pre-wrap',
-                            lineHeight: '1.5'
-                        }}
-                    >
-                        {designContent || '加载中...'}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
-    // Always show conversation panel for all lanes - conversation history is valuable
-    const showTerminal = true;
 
     return (
         <div className="task-detail-container">
             {/* Left Column: Conversation Panel */}
-            {showTerminal && (
-                <div className="task-detail-sidebar">
-                    <ConversationPanel
-                        taskId={task.id}
-                        projectId={projectId}
-                        terminalRef={terminalRef}
-                        onTerminalData={handleTerminalData}
-                        onTerminalResize={handleTerminalResize}
-                        activeTab={activeTab}
-                        onTabChange={setActiveTab}
-                    />
-                </div>
-            )}
+            <div className="task-detail-sidebar">
+                <ConversationPanel
+                    taskId={task.id}
+                    projectId={projectId}
+                    terminalRef={terminalRef}
+                    onTerminalData={handleTerminalData}
+                    onTerminalResize={handleTerminalResize}
+                    activeTab={activeTab}
+                    onTabChange={setActiveTab}
+                    designContent={designContent}
+                    onSaveDesign={async (content) => {
+                        await updateDesign(projectId, task.id, content);
+                        setDesignContent(content);
+                        setIsEditingDesign(false);
+                    }}
+                    isEditingDesign={isEditingDesign}
+                    setIsEditingDesign={setIsEditingDesign}
+                    editedDesignContent={editedDesignContent}
+                    setEditedDesignContent={setEditedDesignContent}
+                    structuredOutput={structuredOutputs}
+                />
+            </div>
 
             {/* Right Column: Task Info & Actions */}
-            <div className="task-detail-main" style={{ width: showTerminal ? '450px' : '100%' }}>
-                <div className="task-detail-header" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1.5rem' }}>
-                    {!isEditing ? (
-                        <>
-                            <button className="secondary-btn" onClick={() => setIsEditing(true)}>编辑</button>
-                            <button className="danger-btn" onClick={handleDelete}>删除</button>
-                        </>
-                    ) : (
-                        <>
-                            <button className="primary-btn" onClick={handleSave}>保存</button>
-                            <button className="secondary-btn" onClick={() => setIsEditing(false)}>取消</button>
-                        </>
-                    )}
-                </div>
-
-                <div className="form-group">
-                    <label className="form-label" style={{ color: 'var(--accent)', fontWeight: 'bold', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Task ID</label>
-                    <div style={{ fontSize: '0.9rem', fontFamily: 'monospace', color: 'var(--text-primary)', marginBottom: '1rem' }}>{task.id}</div>
-                </div>
-
-                <div className="form-group">
-                    <label className="form-label">标题</label>
-                    {isEditing ? (
-                        <input
-                            type="text"
-                            className="form-input"
-                            value={editForm.title}
-                            onChange={e => setEditForm({ ...editForm, title: e.target.value })}
-                        />
-                    ) : (
-                        <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '1rem' }}>{task.title}</div>
-                    )}
-                </div>
-
-                <div className="form-group">
-                    <label className="form-label">描述</label>
-                    {isEditing ? (
-                        <textarea
-                            className="form-textarea"
-                            value={editForm.description}
-                            onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                        />
-                    ) : (
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>{task.description}</div>
-                    )}
-                </div>
-
-                {(task.prompt || isEditing) && (
-                    <div className="form-group">
-                        <label className="form-label">Execution Prompt</label>
-                        {isEditing ? (
-                            <textarea
-                                className="form-textarea"
-                                value={editForm.prompt}
-                                onChange={e => setEditForm({ ...editForm, prompt: e.target.value })}
-                                style={{ minHeight: '120px', fontFamily: 'monospace', fontSize: '0.8rem' }}
-                                placeholder="Claude execution prompt..."
-                            />
+            <div className="task-detail-main">
+                {/* Header Actions */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                    <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>任务详情</h2>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {!isEditing ? (
+                            <>
+                                <button className="btn-unified ghost" onClick={() => setIsEditing(true)}>
+                                    <Edit2 size={14} />
+                                    编辑
+                                </button>
+                                <button className="btn-unified danger" onClick={handleDelete} title="删除任务">
+                                    <Trash2 size={14} />
+                                </button>
+                            </>
                         ) : (
-                            <div style={{
-                                background: 'rgba(0,0,0,0.3)',
-                                padding: '1rem',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                fontFamily: 'monospace',
-                                fontSize: '0.8rem',
-                                color: 'var(--neon-cyan)',
-                                whiteSpace: 'pre-wrap',
-                                marginBottom: '1.5rem'
-                            }}>{task.prompt}</div>
+                            <>
+                                <button className="btn-unified primary" onClick={handleSave}>
+                                    <Save size={14} />
+                                    保存
+                                </button>
+                                <button className="btn-unified secondary" onClick={() => setIsEditing(false)}>
+                                    <X size={14} />
+                                    取消
+                                </button>
+                            </>
+                        )}
+                    </div>
+                </div>
+
+                {/* Primary Action Section */}
+                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '2rem' }}>
+                    <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>核心操作</span>
+                        <span className={`task-status ${task.status} status-badge-glow`}>
+                            {task.status === 'idle' ? '闲置' : task.status === 'running' ? '运行中' : task.status === 'completed' ? '已完成' : '已结束'}
+                        </span>
+                    </div>
+                    {renderMainActionButton()}
+                </div>
+
+                {/* Task Information Group */}
+                <div className="info-group" style={{ marginBottom: '2rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--accent)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                        <Info size={14} />
+                        基本信息
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label">标题</label>
+                        {isEditing ? (
+                            <input className="form-input" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} />
+                        ) : (
+                            <div style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-primary)' }}>{task.title}</div>
+                        )}
+                    </div>
+
+                    <div className="form-group" style={{ marginTop: '1rem' }}>
+                        <label className="form-label">描述</label>
+                        {isEditing ? (
+                            <textarea className="form-textarea" value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
+                        ) : (
+                            <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{task.description}</div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Technical Context Group */}
+                <div className="info-group" style={{ marginBottom: '2rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--accent)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                        <Database size={14} />
+                        技术上下文
+                    </div>
+
+                    {(task.prompt || isEditing) && (
+                        <div className="form-group">
+                            <label className="form-label">执行 Prompt</label>
+                            {isEditing ? (
+                                <textarea className="form-textarea" style={{ fontFamily: 'monospace', minHeight: '100px' }} value={editForm.prompt} onChange={e => setEditForm({ ...editForm, prompt: e.target.value })} />
+                            ) : (
+                                <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--neon-cyan)', whiteSpace: 'pre-wrap' }}>{task.prompt}</div>
+                            )}
+                        </div>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+                        <div>
+                            <label className="form-label">任务 ID</label>
+                            <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{task.id}</div>
+                        </div>
+                        <div>
+                            <label className="form-label">创建者</label>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: task.createdBy === 'claude' ? 'var(--accent)' : 'var(--text-primary)' }}>
+                                {task.createdBy === 'claude' ? '🤖 CLAUDE' : '👤 USER'}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Git & Session Context */}
+                {(task.worktree || task.claudeSession) && (
+                    <div className="info-group">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--accent)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                            <GitBranch size={14} />
+                            环境状态
+                        </div>
+
+                        {task.worktree && (
+                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '0.75rem' }}>
+                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--neon-amber)', marginBottom: '0.25rem' }}>Branch: {task.worktree.branch}</div>
+                                <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>Created: {new Date(task.worktree.createdAt).toLocaleString()}</div>
+                            </div>
+                        )}
+
+                        {task.claudeSession && (
+                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden' }}>Session ID: {task.claudeSession.id}</div>
+                                <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Attached: {new Date(task.claudeSession.createdAt).toLocaleString()}</div>
+                            </div>
                         )}
                     </div>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                    <div className="form-group" style={{ margin: 0 }}>
-                        <label className="form-label">状态</label>
-                        <span className={`task-status ${task.status} status-badge-glow`} style={{ display: 'inline-block' }}>{
-                            task.status === 'idle' ? '待执行' :
-                                task.status === 'running' ? '执行中' :
-                                    task.status === 'completed' ? '已完成' :
-                                        task.status === 'failed' ? '失败' :
-                                            task.status === 'pending-dev' ? '待开发' :
-                                                task.status === 'pending-merge' ? '待合并' :
-                                                    task.status
-                        }</span>
-                    </div>
-
-                    <div className="form-group" style={{ margin: 0 }}>
-                        <label className="form-label">创建者</label>
-                        <span className={`task-creator ${task.createdBy}`} style={{ fontWeight: 'bold' }}>
-                            {task.createdBy === 'claude' ? '🤖 CLAUDE' : '👤 USER'}
-                        </span>
-                    </div>
-                </div>
-
-                {task.claudeSession && (
-                    <div className="form-group" style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
-                        <label className="form-label">Claude Session</label>
-                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
-                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>ID: {task.claudeSession.id}</div>
-                            <div style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>{new Date(task.claudeSession.createdAt).toLocaleString()}</div>
-                        </div>
-                    </div>
-                )}
-
-                {task.worktree && (
-                    <div className="form-group" style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
-                        <label className="form-label">Worktree {task.worktree.removedAt && <span style={{ color: 'var(--neon-rose)' }}>(已删除)</span>}</label>
-                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
-                            <div style={{ color: 'var(--neon-amber)' }}>Branch: {task.worktree.branch}</div>
-                            <div style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>{new Date(task.worktree.createdAt).toLocaleString()}</div>
-                        </div>
-                    </div>
-                )}
-
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem', marginBottom: '1.5rem' }}>
-                    {renderActionButtons()}
-                </div>
-
-                {renderDesignPreview()}
-
-                {structuredOutput && task.laneId !== 'design' && (
-                    <div className="structured-viewer-container" style={{ marginTop: '1.5rem' }}>
-                        <StructuredOutputViewer output={structuredOutput} />
-                    </div>
-                )}
             </div>
         </div>
     );

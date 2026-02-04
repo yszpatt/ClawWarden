@@ -4,7 +4,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { v4 as uuid } from 'uuid';
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import { readGlobalConfig, readProjectData, writeProjectData } from '../utils/json-store';
+import { readGlobalConfig, readProjectData, writeProjectData, writeTaskSummary } from '../utils/json-store';
 import { agentManager } from '../services/agent-manager';
 import { worktreeManager } from '../services/worktree-manager';
 import { conversationStorage } from '../services/conversation-storage';
@@ -298,7 +298,7 @@ export async function executionHandler(fastify: FastifyInstance) {
                     }));
                 }
 
-                // Save to task data
+                // Save to task data (now in separate summary file)
                 try {
                     const config = await readGlobalConfig();
                     for (const proj of config.projects) {
@@ -313,10 +313,14 @@ export async function executionHandler(fastify: FastifyInstance) {
                                 data: event.output,
                                 timestamp: new Date().toISOString()
                             };
-                            task.structuredOutput = structuredOutput;
+
+                            // Save to separate summary file instead of tasks.json
+                            await writeTaskSummary(proj.path, event.taskId, structuredOutput);
+                            console.log('[Execution] Saved structured output to summary file for task:', event.taskId);
+
+                            // Update task timestamp in tasks.json but don't include the output
                             task.updatedAt = new Date().toISOString();
                             await writeProjectData(proj.path, data);
-                            console.log('[Execution] Saved structured output for task:', event.taskId);
                             break;
                         }
                     }
@@ -980,10 +984,11 @@ async function handleConversationDesignStart(
                             content: completeMessage.content,
                         } as ConversationWsMessage));
 
-                        // Also send structured-output if design contains structured data
+                        // Also save structured-output if design contains structured data
                         const structuredOutput = parseDesignToStructuredOutput(currentTextContent, task);
                         if (structuredOutput) {
-                            task.structuredOutput = structuredOutput;
+                            // task.structuredOutput = structuredOutput; // Don't save to task object
+                            await writeTaskSummary(project.path, taskId, structuredOutput);
                             await writeProjectData(project.path, data);
                             connection.socket.send(JSON.stringify({
                                 type: 'structured-output',
@@ -1533,12 +1538,18 @@ async function handleLaneExecutionWithAgent(
                     console.log(`[Execution] Structured output received`);
 
                     const outputType = getOutputTypeForLane(task.laneId);
-                    task.structuredOutput = {
+                    const structuredOutput: StructuredOutput = {
                         type: outputType,
                         schemaVersion: '1.0',
                         data: (sdkMessage as any).structured_output,
                         timestamp: new Date().toISOString(),
-                    } as StructuredOutput;
+                    };
+
+                    // Save to summary file
+                    await writeTaskSummary(project.path, taskId, structuredOutput);
+
+                    // Don't save to tasks.json, just update timestamp
+                    task.updatedAt = new Date().toISOString();
                     await writeProjectData(project.path, data);
 
                     connection.socket.send(JSON.stringify({

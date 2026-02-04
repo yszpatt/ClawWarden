@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { MessageSquare, Terminal } from 'lucide-react';
+import { MessageSquare, Terminal, FileText, Edit2, Save, X, Activity } from 'lucide-react';
 import { useConversation } from '../../hooks/useConversation';
 import { connectionManager } from '../../services/ConnectionManager';
 import type { TerminalRef } from '../Terminal';
@@ -7,6 +7,9 @@ import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { QuickActions } from './QuickActions';
 import { Terminal as TerminalComponent } from '../Terminal';
+import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
+import { StructuredOutputViewer } from '../StructuredOutput';
+import type { StructuredOutput } from '@clawwarden/shared';
 
 interface ConversationPanelProps {
     taskId: string;
@@ -15,9 +18,20 @@ interface ConversationPanelProps {
     onTerminalData?: (data: string) => void;
     onTerminalResize?: (cols: number, rows: number) => void;
     /** Control the active tab from parent (optional) */
-    activeTab?: 'conversation' | 'terminal';
+    activeTab?: 'conversation' | 'terminal' | 'design' | 'summary';
     /** Callback when tab changes */
-    onTabChange?: (tab: 'conversation' | 'terminal') => void;
+    onTabChange?: (tab: 'conversation' | 'terminal' | 'design' | 'summary') => void;
+
+    /** Structured output to display in Summary tab */
+    structuredOutput?: StructuredOutput | StructuredOutput[] | null;
+
+    // Design Props
+    designContent?: string | null;
+    onSaveDesign?: (content: string) => Promise<void>;
+    isEditingDesign?: boolean;
+    setIsEditingDesign?: (v: boolean) => void;
+    editedDesignContent?: string;
+    setEditedDesignContent?: (v: string) => void;
 }
 
 const ConversationPanel = memo(function ConversationPanel({
@@ -28,13 +42,21 @@ const ConversationPanel = memo(function ConversationPanel({
     onTerminalResize,
     activeTab: controlledActiveTab,
     onTabChange,
+
+    designContent,
+    onSaveDesign,
+    isEditingDesign,
+    setIsEditingDesign,
+    editedDesignContent,
+    setEditedDesignContent,
+    structuredOutput,
 }: ConversationPanelProps) {
-    const [internalActiveTab, setInternalActiveTab] = useState<'conversation' | 'terminal'>('conversation');
+    const [internalActiveTab, setInternalActiveTab] = useState<'conversation' | 'terminal' | 'design' | 'summary'>('conversation');
 
     // Use controlled tab if provided, otherwise use internal state
     const activeTab = controlledActiveTab ?? internalActiveTab;
 
-    const handleTabChange = (tab: 'conversation' | 'terminal') => {
+    const handleTabChange = (tab: 'conversation' | 'terminal' | 'design' | 'summary') => {
         if (controlledActiveTab === undefined) {
             setInternalActiveTab(tab);
         }
@@ -55,9 +77,15 @@ const ConversationPanel = memo(function ConversationPanel({
         sendMessage(prompt);
     };
 
+    const handleDesignSave = async () => {
+        if (onSaveDesign && editedDesignContent) {
+            await onSaveDesign(editedDesignContent);
+        }
+    };
+
     return (
         <div className="conversation-panel">
-            {/* Tab bar */}
+            {/* Tab bar (Panel Header) */}
             <div className="chat-tab-bar">
                 <button
                     onClick={() => handleTabChange('conversation')}
@@ -73,12 +101,32 @@ const ConversationPanel = memo(function ConversationPanel({
                     <Terminal size={16} />
                     原始输出
                 </button>
+                {/* Only show design tab if content exists or we are passed handlers to edit it */}
+                {(designContent || setIsEditingDesign) && (
+                    <button
+                        onClick={() => handleTabChange('design')}
+                        className={`chat-tab-btn ${activeTab === 'design' ? 'active' : ''}`}
+                    >
+                        <FileText size={16} />
+                        设计方案
+                    </button>
+                )}
+                {/* Summary Tab (always show if output exists or generic summary) */}
+                <button
+                    onClick={() => handleTabChange('summary')}
+                    className={`chat-tab-btn ${activeTab === 'summary' ? 'active' : ''}`}
+                >
+                    <Activity size={16} />
+                    总结
+                </button>
             </div>
 
-            {/* Content */}
+            {/* Content & Footer Area */}
             {activeTab === 'conversation' ? (
                 <>
-                    <MessageList messages={messages} isStreaming={isStreaming} />
+                    <div className="message-list-container">
+                        <MessageList messages={messages} isStreaming={isStreaming} />
+                    </div>
                     <QuickActions onAction={handleQuickAction} disabled={isStreaming} />
                     <MessageInput
                         onSend={handleSend}
@@ -87,15 +135,87 @@ const ConversationPanel = memo(function ConversationPanel({
                         isStreaming={isStreaming}
                     />
                 </>
-            ) : (
-                <div style={{ flex: 1, padding: '0.5rem', overflow: 'hidden' }}>
-                    <TerminalComponent
-                        ref={terminalRef}
-                        onData={onTerminalData}
-                        onResize={onTerminalResize}
-                    />
+            ) : activeTab === 'terminal' ? (
+                <div className="unified-panel" style={{ border: 'none' }}>
+                    <div className="panel-content" style={{ padding: '4px' }}>
+                        <TerminalComponent
+                            ref={terminalRef}
+                            onData={onTerminalData}
+                            onResize={onTerminalResize}
+                        />
+                    </div>
+                    <div className="panel-footer" style={{ minHeight: '40px', padding: '0.5rem 1rem' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                            Terminal connection: Active
+                        </span>
+                    </div>
                 </div>
-            )}
+            ) : activeTab === 'design' ? (
+                <div className="design-panel">
+                    {/* Design Tab Content Area (Scrollable) */}
+                    <div className="design-content-area">
+                        {isEditingDesign && setEditedDesignContent ? (
+                            <textarea
+                                className="design-textarea"
+                                value={editedDesignContent}
+                                onChange={e => setEditedDesignContent(e.target.value)}
+                                placeholder="在此输入设计方案..."
+                                autoFocus
+                            />
+                        ) : (
+                            <div className="markdown-content">
+                                <MarkdownRenderer content={designContent || '*暂无设计方案*'} />
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Bottom Toolbar to match MessageInput position */}
+                    <div className="design-toolbar">
+                        {isEditingDesign ? (
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                <button
+                                    className="btn-unified primary"
+                                    onClick={handleDesignSave}
+                                >
+                                    <Save size={14} />
+                                    保存
+                                </button>
+                                <button
+                                    className="btn-unified secondary"
+                                    onClick={() => {
+                                        setIsEditingDesign?.(false);
+                                        setEditedDesignContent?.(designContent || '');
+                                    }}
+                                >
+                                    <X size={14} />
+                                    取消
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                className="btn-unified secondary"
+                                onClick={() => setIsEditingDesign?.(true)}
+                            >
+                                <Edit2 size={14} />
+                                编辑
+                            </button>
+                        )}
+                    </div>
+                </div>
+            ) : activeTab === 'summary' ? (
+                <div className="unified-panel" style={{ border: 'none' }}>
+                    <div className="panel-content" style={{ padding: '2rem' }}>
+                        {structuredOutput ? (
+                            <StructuredOutputViewer outputs={structuredOutput} />
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', gap: '1rem' }}>
+                                <Activity size={32} opacity={0.3} />
+                                <span>暂无总结信息。请在执行完成后查看。</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ) : null}
         </div>
     );
 });

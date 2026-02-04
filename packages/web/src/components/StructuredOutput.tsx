@@ -1,26 +1,52 @@
 import { useState } from 'react';
 import type { StructuredOutput, DesignOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface StructuredOutputProps {
-    output: StructuredOutput;
+    outputs: StructuredOutput | StructuredOutput[];
 }
 
-export function StructuredOutputViewer({ output }: StructuredOutputProps) {
-    const [isExpanded, setIsExpanded] = useState(true);
+export function StructuredOutputViewer({ outputs }: StructuredOutputProps) {
+    const list = Array.isArray(outputs) ? outputs : outputs ? [outputs] : [];
 
-    if (!output || !output.data) {
-        return null;
+    if (list.length === 0) {
+        return (
+            <div style={{
+                padding: '2rem',
+                textAlign: 'center',
+                color: 'var(--text-secondary)',
+                background: 'var(--bg-secondary)',
+                borderRadius: '12px',
+                border: '1px dashed var(--border-color)'
+            }}>
+                暂无总结数据
+            </div>
+        );
     }
 
-    const data = output.data as DesignOutput | DevelopmentOutput | TestingOutput;
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%' }}>
+            {list.map((output, idx) => (
+                <SingleOutputViewer key={idx} output={output} defaultExpanded={false} />
+            ))}
+        </div>
+    );
+}
+
+function SingleOutputViewer({ output, defaultExpanded = false }: { output: StructuredOutput, defaultExpanded?: boolean }) {
+    const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+    if (!output || !output.data) return null;
+    const data = output.data as any;
 
     return (
         <div className="structured-output" style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            marginTop: '1rem',
-            overflow: 'hidden'
+            borderRadius: '12px',
+            overflow: 'hidden',
+            width: '100%'
         }}>
             {/* Header */}
             <div
@@ -28,48 +54,64 @@ export function StructuredOutputViewer({ output }: StructuredOutputProps) {
                 style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '0.75rem 1rem',
+                    alignItems: 'flex-start',
+                    padding: '1rem',
                     background: 'var(--bg-secondary)',
-                    borderBottom: '1px solid var(--border-color)',
+                    borderBottom: isExpanded ? '1px solid var(--border-color)' : 'none',
                     cursor: 'pointer',
-                    userSelect: 'none'
+                    userSelect: 'none',
+                    gap: '1rem'
                 }}
                 onClick={() => setIsExpanded(!isExpanded)}
             >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', flex: 1 }}>
                     <span style={{
-                        padding: '2px 8px',
+                        width: '85px',
+                        textAlign: 'center',
+                        display: 'inline-block',
+                        padding: '2px 0',
                         borderRadius: '4px',
-                        fontSize: '0.7rem',
+                        fontSize: '0.6rem',
                         fontWeight: 'bold',
                         textTransform: 'uppercase',
                         background: getOutputTypeColor(output.type),
-                        color: '#fff'
+                        color: '#fff',
+                        flexShrink: 0,
+                        marginTop: '2px'
                     }}>
                         {output.type}
                     </span>
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)', opacity: 0.8 }}>
-                        {new Date(output.timestamp).toLocaleString()}
-                    </span>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: '1.4' }}>
+                            {data.summary || (output.type === 'design' ? '设计方案' : output.type === 'development' ? '开发变更' : '测试报告')}
+                        </span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', opacity: 0.6 }}>
+                            {new Date(output.timestamp).toLocaleString()}
+                        </span>
+                    </div>
                 </div>
-                <button style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    padding: '4px',
-                    fontSize: '1rem',
-                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s'
-                }}>
-                    ▼
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', height: '100%', minHeight: '24px', alignSelf: 'center' }}>
+                    <button style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        fontSize: '1rem',
+                        transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                    }}>
+                        ▼
+                    </button>
+                </div>
             </div>
 
             {/* Content */}
             {isExpanded && (
-                <div style={{ padding: '1rem' }}>
+                <div style={{ padding: '1.25rem' }}>
                     {renderOutputContent(output.type, data)}
                 </div>
             )}
@@ -86,132 +128,83 @@ function getOutputTypeColor(type: string): string {
     }
 }
 
-function renderOutputContent(type: string, data: DesignOutput | DevelopmentOutput | TestingOutput) {
+function renderOutputContent(type: string, data: any) {
     switch (type) {
         case 'design':
-            return renderDesignOutput(data as DesignOutput);
+            return renderDesignOutput(data);
         case 'development':
-            return renderDevelopmentOutput(data as DevelopmentOutput);
+            return renderDevelopmentOutput(data);
         case 'testing':
-            return renderTestingOutput(data as TestingOutput);
+            return renderTestingOutput(data);
         default:
-            return <pre style={{ fontSize: '0.8rem', overflow: 'auto' }}>{JSON.stringify(data, null, 2)}</pre>;
+            return renderGenericOutput(data);
     }
+}
+
+function renderGenericOutput(data: any) {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {data.details && (
+                <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>详情</h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.6', whiteSpace: 'pre-wrap', color: 'var(--text-secondary)' }}>
+                        {data.details}
+                    </p>
+                </div>
+            )}
+            {/* Generic fallback for unexpected data */}
+            {!data.details && (
+                <pre style={{ fontSize: '0.75rem', overflow: 'auto', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '4px' }}>
+                    {JSON.stringify(data, null, 2)}
+                </pre>
+            )}
+        </div>
+    );
 }
 
 function renderDesignOutput(data: DesignOutput) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Summary */}
-            {data.summary && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>摘要</h4>
-                    <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-primary)' }}>
-                        {data.summary}
-                    </p>
-                </div>
-            )}
-
-            {/* Approach */}
-            {data.approach && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>技术方案</h4>
-                    <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.5', whiteSpace: 'pre-wrap', color: 'var(--text-primary)' }}>
-                        {data.approach}
-                    </p>
-                </div>
-            )}
-
-            {/* Components */}
-            {data.components && data.components.length > 0 && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>组件</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {data.components.map((component, idx) => (
-                            <div key={idx} style={{
-                                padding: '0.5rem',
-                                background: 'var(--bg-secondary)',
-                                borderRadius: '4px',
-                                border: '1px solid var(--border-color)'
-                            }}>
-                                <div style={{ fontWeight: 'bold', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                                    {component.name}
-                                </div>
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', opacity: 0.8, marginTop: '0.25rem' }}>
-                                    {component.description}
-                                </div>
-                                {component.files && component.files.length > 0 && (
-                                    <div style={{ marginTop: '0.5rem' }}>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)', opacity: 0.6 }}>文件:</div>
-                                        {component.files.map((file, fIdx) => (
-                                            <code key={fIdx} style={{
-                                                display: 'inline-block',
-                                                marginRight: '0.5rem',
-                                                marginTop: '0.25rem',
-                                                padding: '2px 6px',
-                                                background: 'var(--bg-tertiary)',
-                                                borderRadius: '2px',
-                                                fontSize: '0.75rem',
-                                                color: 'var(--accent)'
-                                            }}>
-                                                {file}
-                                            </code>
-                                        ))}
-                                    </div>
-                                )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {/* Sections (Parsed from Markdown) */}
+            {(data as any).sections && Object.keys((data as any).sections).length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    {Object.entries((data as any).sections).map(([title, content], idx) => (
+                        <div key={idx}>
+                            <h4 style={{ margin: '0 0 0.75rem 0', color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 600, borderLeft: '3px solid var(--accent)', paddingLeft: '0.75rem' }}>
+                                {title}
+                            </h4>
+                            <div className="markdown-content" style={{ fontSize: '0.875rem', lineHeight: '1.6', color: 'var(--text-secondary)', paddingLeft: '1rem' }}>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {content as string}
+                                </ReactMarkdown>
                             </div>
-                        ))}
-                    </div>
+                        </div>
+                    ))}
                 </div>
             )}
 
-            {/* Dependencies */}
-            {data.dependencies && data.dependencies.length > 0 && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>依赖项</h4>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        {data.dependencies.map((dep, idx) => (
-                            <code key={idx} style={{
-                                padding: '4px 8px',
-                                background: 'var(--bg-secondary)',
-                                borderRadius: '4px',
-                                fontSize: '0.8rem',
-                                color: 'var(--text-primary)'
-                            }}>
-                                {dep}
-                            </code>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Considerations */}
-            {data.considerations && data.considerations.length > 0 && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>注意事项</h4>
-                    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                        {data.considerations.map((item, idx) => (
-                            <li key={idx}>{item}</li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {/* Complexity */}
-            {data.estimatedComplexity && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>复杂度评估</h4>
-                    <span style={{
-                        padding: '4px 12px',
-                        borderRadius: '12px',
-                        fontSize: '0.8rem',
-                        fontWeight: 'bold',
-                        background: getComplexityColor(data.estimatedComplexity),
-                        color: '#fff'
-                    }}>
-                        {data.estimatedComplexity.toUpperCase()}
-                    </span>
-                </div>
+            {!((data as any).sections) && (
+                <>
+                    {data.approach && (
+                        <div>
+                            <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>技术方案</h4>
+                            <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.5', whiteSpace: 'pre-wrap', color: 'var(--text-primary)' }}>{data.approach}</p>
+                        </div>
+                    )}
+                    {data.components && data.components.length > 0 && (
+                        <div>
+                            <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>组件设计</h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                {data.components.map((c, i) => (
+                                    <div key={i} style={{ padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
+                                        <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{c.name}</div>
+                                        <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{c.description}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
@@ -219,25 +212,16 @@ function renderDesignOutput(data: DesignOutput) {
 
 function renderDevelopmentOutput(data: DevelopmentOutput) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Summary */}
-            {data.summary && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>摘要</h4>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{data.summary}</p>
-                </div>
-            )}
-
-            {/* Changes */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {data.changes && data.changes.length > 0 && (
                 <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>变更</h4>
+                    <h4 style={{ margin: '0 0 0.75rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>变更详情</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {data.changes.map((change, idx) => (
                             <div key={idx} style={{
-                                padding: '0.5rem',
+                                padding: '0.75rem',
                                 background: 'var(--bg-secondary)',
-                                borderRadius: '4px',
+                                borderRadius: '6px',
                                 display: 'flex',
                                 gap: '0.75rem',
                                 alignItems: 'center'
@@ -245,63 +229,26 @@ function renderDevelopmentOutput(data: DevelopmentOutput) {
                                 <span style={{
                                     padding: '2px 8px',
                                     borderRadius: '4px',
-                                    fontSize: '0.7rem',
+                                    fontSize: '0.65rem',
                                     fontWeight: 'bold',
                                     background: getChangeActionColor(change.action),
                                     color: '#fff'
                                 }}>
-                                    {change.action}
+                                    {change.action.toUpperCase()}
                                 </span>
-                                <code style={{ fontSize: '0.85rem', color: 'var(--accent)', fontWeight: '500' }}>{change.file}</code>
+                                <code style={{ fontSize: '0.85rem', color: 'var(--accent)' }}>{change.file}</code>
                                 <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{change.description}</span>
                             </div>
                         ))}
                     </div>
                 </div>
             )}
-
-            {/* Tests Added */}
-            {data.testsAdded && data.testsAdded.length > 0 && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>新增测试</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                        {data.testsAdded.map((test, idx) => (
-                            <code key={idx} style={{
-                                display: 'block',
-                                padding: '4px 8px',
-                                background: 'var(--bg-secondary)',
-                                borderRadius: '4px',
-                                fontSize: '0.8rem',
-                                color: 'var(--text-primary)'
-                            }}>
-                                {test}
-                            </code>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Breaking Changes */}
-            {data.breakingChanges && data.breakingChanges.length > 0 && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#EF4444', fontSize: '0.9rem' }}>破坏性变更</h4>
-                    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: '#EF4444' }}>
-                        {data.breakingChanges.map((change, idx) => (
-                            <li key={idx}>{change}</li>
-                        ))}
-                    </ul>
-                </div>
-            )}
-
-            {/* Next Steps */}
             {data.nextSteps && data.nextSteps.length > 0 && (
                 <div>
                     <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>后续步骤</h4>
-                    <ol style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-primary)' }}>
-                        {data.nextSteps.map((step, idx) => (
-                            <li key={idx}>{step}</li>
-                        ))}
-                    </ol>
+                    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem' }}>
+                        {data.nextSteps.map((s, i) => <li key={i}>{s}</li>)}
+                    </ul>
                 </div>
             )}
         </div>
@@ -310,113 +257,29 @@ function renderDevelopmentOutput(data: DevelopmentOutput) {
 
 function renderTestingOutput(data: TestingOutput) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Summary */}
-            {data.summary && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>摘要</h4>
-                    <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{data.summary}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+                <div style={{ flex: 1, padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>通过率</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10B981' }}>
+                        {data.testsRun > 0 ? Math.round((data.testsPassed / data.testsRun) * 100) : 0}%
+                    </div>
                 </div>
-            )}
-
-            {/* Test Results */}
-            <div>
-                <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>测试结果</h4>
-                <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                    <div style={{
-                        padding: '0.5rem 1rem',
-                        background: 'var(--bg-secondary)',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-color)'
-                    }}>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>运行</div>
-                        <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{data.testsRun}</div>
+                <div style={{ flex: 1, padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '8px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>运行/通过/失败</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>
+                        {data.testsRun} / <span style={{ color: '#10B981' }}>{data.testsPassed}</span> / <span style={{ color: '#EF4444' }}>{data.testsFailed}</span>
                     </div>
-                    <div style={{
-                        padding: '0.5rem 1rem',
-                        background: 'var(--bg-secondary)',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-color)'
-                    }}>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>通过</div>
-                        <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#10B981' }}>{data.testsPassed}</div>
-                    </div>
-                    <div style={{
-                        padding: '0.5rem 1rem',
-                        background: 'var(--bg-secondary)',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-color)'
-                    }}>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>失败</div>
-                        <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#EF4444' }}>{data.testsFailed}</div>
-                    </div>
-                    {data.testsRun > 0 && (
-                        <div style={{
-                            padding: '0.5rem 1rem',
-                            background: 'var(--bg-secondary)',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border-color)'
-                        }}>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>通过率</div>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: getPassRateColor(data.testsPassed / data.testsRun) }}>
-                                {Math.round((data.testsPassed / data.testsRun) * 100)}%
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
-
-            {/* Coverage */}
-            {data.coverage && (
-                <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>覆盖率</h4>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
-                        <div>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>行: </span>
-                            <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>{data.coverage.lines}%</span>
-                        </div>
-                        <div>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>函数: </span>
-                            <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>{data.coverage.functions}%</span>
-                        </div>
-                        <div>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>分支: </span>
-                            <span style={{ fontSize: '0.9rem', color: 'var(--text-primary)', fontWeight: 'bold' }}>{data.coverage.branches}%</span>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Issues */}
             {data.issues && data.issues.length > 0 && (
                 <div>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>问题</h4>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>发现的问题</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                         {data.issues.map((issue, idx) => (
-                            <div key={idx} style={{
-                                padding: '0.5rem',
-                                background: 'var(--bg-secondary)',
-                                borderRadius: '4px',
-                                borderLeft: `3px solid ${getSeverityColor(issue.severity)}`
-                            }}>
-                                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                                    <span style={{
-                                        padding: '2px 8px',
-                                        borderRadius: '4px',
-                                        fontSize: '0.7rem',
-                                        fontWeight: 'bold',
-                                        background: getSeverityColor(issue.severity),
-                                        color: '#fff'
-                                    }}>
-                                        {issue.severity.toUpperCase()}
-                                    </span>
-                                    <span style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{issue.description}</span>
-                                </div>
-                                {issue.location && (
-                                    <code style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                                        {issue.location}
-                                    </code>
-                                )}
+                            <div key={idx} style={{ padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '6px', borderLeft: `4px solid ${getSeverityColor(issue.severity)}` }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{issue.description}</div>
+                                {issue.location && <code style={{ fontSize: '0.7rem', opacity: 0.6 }}>{issue.location}</code>}
                             </div>
                         ))}
                     </div>
@@ -424,15 +287,6 @@ function renderTestingOutput(data: TestingOutput) {
             )}
         </div>
     );
-}
-
-function getComplexityColor(complexity: string): string {
-    switch (complexity) {
-        case 'low': return '#10B981';
-        case 'medium': return '#F59E0B';
-        case 'high': return '#EF4444';
-        default: return '#6B7280';
-    }
 }
 
 function getChangeActionColor(action: string): string {
@@ -452,10 +306,4 @@ function getSeverityColor(severity: string): string {
         case 'critical': return '#DC2626';
         default: return '#6B7280';
     }
-}
-
-function getPassRateColor(rate: number): string {
-    if (rate >= 0.9) return '#10B981';
-    if (rate >= 0.7) return '#F59E0B';
-    return '#EF4444';
 }

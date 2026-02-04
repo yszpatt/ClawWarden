@@ -70,3 +70,32 @@ export async function initializeProject(projectPath: string, projectId: string):
     await writeProjectData(projectPath, data);
     return data;
 }
+
+export async function readTaskSummary(projectPath: string, taskId: string): Promise<any[]> {
+    const { getProjectSummaryFile } = await import('./paths');
+    const filePath = getProjectSummaryFile(projectPath, taskId);
+    if (!existsSync(filePath)) return [];
+    const content = await readFile(filePath, 'utf-8');
+    const data = JSON.parse(content);
+    return Array.isArray(data) ? data : [data];
+}
+
+export async function writeTaskSummary(projectPath: string, taskId: string, summary: any): Promise<void> {
+    const { getProjectSummaryFile } = await import('./paths');
+    const filePath = getProjectSummaryFile(projectPath, taskId);
+    await ensureDir(filePath);
+
+    // Append to existing array if it exists
+    let existing: any[] = [];
+    if (existsSync(filePath)) {
+        const content = await readFile(filePath, 'utf-8');
+        const data = JSON.parse(content);
+        existing = Array.isArray(data) ? data : [data];
+    }
+
+    // Check for duplicates of the same type/phase to avoid re-adding during retries?
+    // For now, just pushing is simpler.
+    existing.push(summary);
+
+    await writeFile(filePath, JSON.stringify(existing, null, 2));
+}

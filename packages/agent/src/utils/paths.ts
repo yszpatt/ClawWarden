@@ -11,3 +11,11 @@ export function getProjectConfigDir(projectPath: string): string {
 export function getProjectTasksFile(projectPath: string): string {
     return join(getProjectConfigDir(projectPath), 'tasks.json');
 }
+
+export function getProjectSummaryDir(projectPath: string): string {
+    return join(getProjectConfigDir(projectPath), 'summary');
+}
+
+export function getProjectSummaryFile(projectPath: string, taskId: string): string {
+    return join(getProjectSummaryDir(projectPath), `${taskId}.json`);
+}

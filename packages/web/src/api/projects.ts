@@ -129,6 +129,15 @@ export async function fetchTask(
     return res.json();
 }
 
+export async function fetchTaskSummary(
+    projectId: string,
+    taskId: string
+): Promise<{ summary: any }> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}/summary`);
+    if (!res.ok) throw new Error('Failed to fetch task summary');
+    return res.json();
+}
+
 // Worktree API functions
 export async function mergeWorktree(
     projectId: string,

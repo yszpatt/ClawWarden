@@ -4,7 +4,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { readGlobalConfig, readProjectData, writeProjectData } from '../utils/json-store';
+import { readGlobalConfig, readProjectData, writeProjectData, readTaskSummary } from '../utils/json-store';
 import { worktreeManager } from '../services/worktree-manager';
 import { conversationStorage } from '../services/conversation-storage';
 import type { Task } from '@clawwarden/shared';
@@ -68,6 +68,18 @@ export async function taskRoutes(fastify: FastifyInstance) {
         if (!task) throw { statusCode: 404, message: 'Task not found' };
 
         return { task };
+    });
+
+    // Get task summary
+    fastify.get<{
+        Params: { projectId: string; taskId: string };
+    }>('/api/projects/:projectId/tasks/:taskId/summary', async (request) => {
+        const config = await readGlobalConfig();
+        const project = config.projects.find(p => p.id === request.params.projectId);
+        if (!project) throw { statusCode: 404, message: 'Project not found' };
+
+        const summary = await readTaskSummary(project.path, request.params.taskId);
+        return { summary };
     });
 
     // Update task
