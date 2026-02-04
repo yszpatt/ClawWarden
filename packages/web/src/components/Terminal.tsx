@@ -6,7 +6,7 @@ export function useTerminalConnection(
     _projectId: string,
     taskId: string,
     callbacks?: {
-        onDesignComplete?: (content: string, designPath: string) => void;
+        onPlanComplete?: (content: string, planPath: string) => void;
         onStatusChange?: (status: string) => void;
         onStructuredOutput?: (output: unknown) => void;
     }
@@ -41,10 +41,10 @@ export function useTerminalConnection(
                 if (callbacksRef.current?.onStatusChange) {
                     callbacksRef.current.onStatusChange(message.exitCode === 0 ? 'completed' : 'failed');
                 }
-            } else if (message.type === 'design-complete') {
-                console.log('[TaskConnection] Design complete:', message.designPath);
-                if (callbacksRef.current?.onDesignComplete && message.content) {
-                    callbacksRef.current.onDesignComplete(message.content, message.designPath);
+            } else if (message.type === 'conversation.plan_complete') {
+                console.log('[TaskConnection] Plan complete:', message.planPath);
+                if (callbacksRef.current?.onPlanComplete && message.content) {
+                    callbacksRef.current.onPlanComplete(message.content, message.planPath);
                 }
                 if (callbacksRef.current?.onStatusChange) {
                     callbacksRef.current.onStatusChange('pending-dev');

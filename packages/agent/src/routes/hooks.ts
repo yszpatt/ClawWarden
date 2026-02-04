@@ -73,7 +73,7 @@ export async function hookRoutes(fastify: FastifyInstance) {
             throw { statusCode: 400, message: 'taskId and laneId are required' };
         }
 
-        const validLanes = ['design', 'develop', 'test', 'pending-merge', 'archived'];
+        const validLanes = ['plan', 'develop', 'test', 'pending-merge', 'archived'];
         if (!validLanes.includes(laneId)) {
             throw { statusCode: 400, message: `Invalid lane: ${laneId}` };
         }

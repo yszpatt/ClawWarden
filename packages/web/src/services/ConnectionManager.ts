@@ -12,7 +12,7 @@ export interface WsMessage {
     sessionId?: string;
     taskId?: string;
     output?: unknown;  // For structured-output
-    designPath?: string;
+    planPath?: string;
     content?: string;  // For design-complete
     // Conversation message fields
     messageId?: string;

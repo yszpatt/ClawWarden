@@ -52,9 +52,9 @@ export class AgentManager extends EventEmitter {
     }
 
     /**
-     * Generate a design document for a task using the Agent SDK.
+     * Generate a plan document for a task using the Agent SDK.
      */
-    async generateDesign(
+    async generatePlan(
         taskId: string,
         projectPath: string,
         userPrompt: string,
@@ -66,12 +66,12 @@ export class AgentManager extends EventEmitter {
         let content = '';
         try {
             await this.ready;
-            console.log(`[AgentManager] generateDesign called for task: ${taskId}`);
+            console.log(`[AgentManager] generatePlan called for task: ${taskId}`);
             console.log(`[AgentManager] projectPath: ${projectPath}`);
             console.log(`[AgentManager] userPrompt length: ${userPrompt?.length || 0}`);
             console.log(`[AgentManager] systemPrompt length: ${systemPrompt?.length || 0}`);
             console.log(`[AgentManager] outputFormat:`, outputFormat ? 'enabled' : 'none');
-            callbacks?.onLog(`[AgentManager] Starting design generation for task: ${taskId}`);
+            callbacks?.onLog(`[AgentManager] Starting plan generation for task: ${taskId}`);
 
 
             const prompt = systemPrompt
@@ -88,7 +88,7 @@ export class AgentManager extends EventEmitter {
                 queryOptions.outputFormat = outputFormat;
             }
 
-            console.log(`[AgentManager] Calling SDK query() for design...`);
+            console.log(`[AgentManager] Calling SDK query() for plan...`);
             const stream = query({
                 prompt,
                 options: queryOptions
@@ -109,7 +109,7 @@ export class AgentManager extends EventEmitter {
             let sdkSessionId: string | undefined;
             for await (const message of stream) {
                 messageCount++;
-                console.log(`[AgentManager] Design Message #${messageCount}: type=${message.type}, has_session_id=${!!(message as any).session_id}`);
+                console.log(`[AgentManager] Plan Message #${messageCount}: type=${message.type}, has_session_id=${!!(message as any).session_id}`);
 
                 // Capture SDK session ID from first message
                 if (!sdkSessionId && (message as any).session_id) {
@@ -140,9 +140,9 @@ export class AgentManager extends EventEmitter {
                     if (message.message.content) {
                         for (const block of message.message.content) {
                             if (block.type === 'tool_use') {
-                                const toolUseMsg = `[Design Agent] Reading: ${block.name} ${JSON.stringify(block.input)}\r\n`;
+                                const toolUseMsg = `[Plan Agent] Reading: ${block.name} ${JSON.stringify(block.input)}\r\n`;
                                 console.log(`[AgentManager] Tool use: ${block.name}`);
-                                callbacks?.onLog(toolUseMsg); // Use log for design steps to distinguish from content
+                                callbacks?.onLog(toolUseMsg); // Use log for plan steps to distinguish from content
                                 // Update buffer
                                 const session = this.sessions.get(taskId);
                                 if (session) session.outputBuffer += `\x1b[36m${toolUseMsg}\x1b[0m`;
@@ -150,9 +150,9 @@ export class AgentManager extends EventEmitter {
                                 // Text blocks in assistant messages
                                 console.log(`[AgentManager] Assistant text block, length: ${block.text?.length || 0}`);
                                 content += block.text;
-                                // Don't stream markdown to terminal for design generation
-                                // The content will be displayed in the design preview panel
-                                callbacks?.onLog(`[Design] Generating content... (${content.length} chars)`);
+                                // Don't stream markdown to terminal for plan generation
+                                // The content will be displayed in the plan preview panel
+                                callbacks?.onLog(`[Plan] Generating content... (${content.length} chars)`);
                                 const session = this.sessions.get(taskId);
                                 if (session) session.outputBuffer += block.text;
                             }
@@ -175,7 +175,7 @@ export class AgentManager extends EventEmitter {
                         console.log(`[AgentManager] Execution errors:`, (message as any).errors);
                         callbacks?.onError(new Error((message as any).errors?.join('\n') || 'Unknown error'));
                     } else if (message.subtype === 'success') {
-                        console.log(`[AgentManager] Design generation completed successfully`);
+                        console.log(`[AgentManager] Plan generation completed successfully`);
                     }
                 }
                 // Log unknown message types
@@ -184,13 +184,13 @@ export class AgentManager extends EventEmitter {
                 }
             }
 
-            console.log(`[AgentManager] Design message loop ended. Total messages: ${messageCount}, Content length: ${content.length}`);
+            console.log(`[AgentManager] Plan message loop ended. Total messages: ${messageCount}, Content length: ${content.length}`);
             callbacks?.onLog(`[AgentManager] Generation complete. Content length: ${content.length}`);
             return content;
 
         } catch (error: any) {
             this.initializingTasks.delete(taskId);
-            console.error(`[AgentManager] Design generation error for task ${taskId}:`, error);
+            console.error(`[AgentManager] Plan generation error for task ${taskId}:`, error);
             console.error(`[AgentManager] Error message: ${error?.message}`);
             console.error(`[AgentManager] Error stack: ${error?.stack}`);
             // Ignore process exit error if we got content
@@ -300,7 +300,7 @@ export class AgentManager extends EventEmitter {
                     description: 'Update the status of the current task in ClawWarden. Use this when you start working, complete a task, or encounter a failure. You can also move the task to a different lane.',
                     inputSchema: z.object({
                         status: z.enum(['idle', 'running', 'completed', 'failed', 'pending-dev', 'pending-merge']).describe('The new status of the task.'),
-                        moveTo: z.enum(['design', 'develop', 'test', 'pending-merge', 'archived']).optional().describe('Move the task to a new Kanban lane.'),
+                        moveTo: z.enum(['plan', 'develop', 'test', 'pending-merge', 'archived']).optional().describe('Move the task to a new Kanban lane.'),
                         description: z.string().optional().describe('A brief description of the update.')
                     }),
                     handler: async (args) => {

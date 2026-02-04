@@ -13,9 +13,9 @@ interface ConversationPanelProps {
     taskId: string;
     projectId: string;
     /** Control the active tab from parent (optional) */
-    activeTab?: 'conversation' | 'design' | 'summary';
+    activeTab?: 'conversation' | 'plan' | 'summary';
     /** Callback when tab changes */
-    onTabChange?: (tab: 'conversation' | 'design' | 'summary') => void;
+    onTabChange?: (tab: 'conversation' | 'plan' | 'summary') => void;
 
     /** Structured output to display in Summary tab */
     structuredOutput?: StructuredOutput | StructuredOutput[] | null;
@@ -43,12 +43,12 @@ const ConversationPanel = memo(function ConversationPanel({
     setEditedDesignContent,
     structuredOutput,
 }: ConversationPanelProps) {
-    const [internalActiveTab, setInternalActiveTab] = useState<'conversation' | 'design' | 'summary'>('conversation');
+    const [internalActiveTab, setInternalActiveTab] = useState<'conversation' | 'plan' | 'summary'>('conversation');
 
     // Use controlled tab if provided, otherwise use internal state
     const activeTab = controlledActiveTab ?? internalActiveTab;
 
-    const handleTabChange = (tab: 'conversation' | 'design' | 'summary') => {
+    const handleTabChange = (tab: 'conversation' | 'plan' | 'summary') => {
         if (controlledActiveTab === undefined) {
             setInternalActiveTab(tab);
         }
@@ -86,14 +86,14 @@ const ConversationPanel = memo(function ConversationPanel({
                     <MessageSquare size={16} />
                     对话
                 </button>
-                {/* Only show design tab if content exists or we are passed handlers to edit it */}
+                {/* Only show plan tab if content exists or we are passed handlers to edit it */}
                 {(designContent || setIsEditingDesign) && (
                     <button
-                        onClick={() => handleTabChange('design')}
-                        className={`chat-tab-btn ${activeTab === 'design' ? 'active' : ''}`}
+                        onClick={() => handleTabChange('plan')}
+                        className={`chat-tab-btn ${activeTab === 'plan' ? 'active' : ''}`}
                     >
                         <FileText size={16} />
-                        设计方案
+                        计划方案
                     </button>
                 )}
                 {/* Summary Tab (always show if output exists or generic summary) */}
@@ -120,21 +120,22 @@ const ConversationPanel = memo(function ConversationPanel({
                         isStreaming={isStreaming}
                     />
                 </>
-            ) : activeTab === 'design' ? (
+            ) : activeTab === 'plan' ? (
                 <div className="design-panel">
-                    {/* Design Tab Content Area (Scrollable) */}
+                    {/* Plan Tab Content Area (Scrollable) */}
                     <div className="design-content-area">
                         {isEditingDesign && setEditedDesignContent ? (
                             <textarea
                                 className="design-textarea"
+                                box-sizing="border-box"
                                 value={editedDesignContent}
                                 onChange={e => setEditedDesignContent(e.target.value)}
-                                placeholder="在此输入设计方案..."
+                                placeholder="在此输入计划方案..."
                                 autoFocus
                             />
                         ) : (
                             <div className="markdown-content">
-                                <MarkdownRenderer content={designContent || '*暂无设计方案*'} />
+                                <MarkdownRenderer content={designContent || '*暂无计划方案*'} />
                             </div>
                         )}
                     </div>

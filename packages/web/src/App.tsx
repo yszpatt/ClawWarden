@@ -84,7 +84,7 @@ function App() {
     try {
       const newTask = await createTask(currentProject.id, {
         ...taskData,
-        laneId: 'design', // Default to design lane
+        laneId: 'plan', // Default to plan lane
       });
       addTask(newTask);
       setShowTaskForm(false);

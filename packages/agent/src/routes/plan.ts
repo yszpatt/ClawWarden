@@ -3,11 +3,11 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { readGlobalConfig, readProjectData, writeProjectData } from '../utils/json-store';
 
-export async function designRoutes(fastify: FastifyInstance) {
-    // 获取设计方案内容
+export async function planRoutes(fastify: FastifyInstance) {
+    // 获取计划方案内容
     fastify.get<{
         Params: { projectId: string; taskId: string };
-    }>('/api/projects/:projectId/tasks/:taskId/design', async (request) => {
+    }>('/api/projects/:projectId/tasks/:taskId/plan', async (request) => {
         const config = await readGlobalConfig();
         const project = config.projects.find(p => p.id === request.params.projectId);
         if (!project) throw { statusCode: 404, message: 'Project not found' };
@@ -16,25 +16,25 @@ export async function designRoutes(fastify: FastifyInstance) {
         const task = data.tasks.find(t => t.id === request.params.taskId);
         if (!task) throw { statusCode: 404, message: 'Task not found' };
 
-        if (!task.designPath) {
-            throw { statusCode: 404, message: 'Design document not found' };
+        if (!task.planPath) {
+            throw { statusCode: 404, message: 'Plan document not found' };
         }
 
-        // Design files are now stored in project directory: {projectPath}/.clawwarden/designs/
-        const designFullPath = path.join(project.path, task.designPath);
-        const content = await fs.readFile(designFullPath, 'utf-8');
+        // Plan files are now stored in project directory: {projectPath}/.clawwarden/plans/
+        const planFullPath = path.join(project.path, task.planPath);
+        const content = await fs.readFile(planFullPath, 'utf-8');
 
         return {
-            designPath: task.designPath,
+            planPath: task.planPath,
             content
         };
     });
 
-    // 更新设计方案内容
+    // 更新计划方案内容
     fastify.put<{
         Params: { projectId: string; taskId: string };
         Body: { content: string };
-    }>('/api/projects/:projectId/tasks/:taskId/design', async (request) => {
+    }>('/api/projects/:projectId/tasks/:taskId/plan', async (request) => {
         const config = await readGlobalConfig();
         const project = config.projects.find(p => p.id === request.params.projectId);
         if (!project) throw { statusCode: 404, message: 'Project not found' };
@@ -43,20 +43,23 @@ export async function designRoutes(fastify: FastifyInstance) {
         const task = data.tasks.find(t => t.id === request.params.taskId);
         if (!task) throw { statusCode: 404, message: 'Task not found' };
 
-        if (!task.designPath) {
-            throw { statusCode: 400, message: 'Task has no design document' };
+        if (!task.planPath) {
+            // Create planPath if it doesn't exist
+            const plansDir = path.join(project.path, '.clawwarden', 'plans');
+            await fs.mkdir(plansDir, { recursive: true });
+            task.planPath = `.clawwarden/plans/${request.params.taskId}-plan.md`;
         }
 
-        // Design files are now stored in project directory: {projectPath}/.clawwarden/designs/
-        const designFullPath = path.join(project.path, task.designPath);
-        await fs.writeFile(designFullPath, request.body.content, 'utf-8');
+        // Plan files are now stored in project directory: {projectPath}/.clawwarden/plans/
+        const planFullPath = path.join(project.path, task.planPath);
+        await fs.writeFile(planFullPath, request.body.content, 'utf-8');
 
         task.updatedAt = new Date().toISOString();
         await writeProjectData(project.path, data);
 
         return {
             success: true,
-            designPath: task.designPath
+            planPath: task.planPath
         };
     });
 }

@@ -9,7 +9,7 @@ ClawWarden is a sophisticated Kanban-style task management dashboard designed to
 
 ## ✨ Key Features
 
-- **📋 Kanban Workflow**: Manage tasks through distinct stages (Design, Develop, Test, etc.).
+- **📋 Kanban Workflow**: Manage tasks through distinct stages (Plan, Develop, Test, etc.).
 - **📝 Incremental Summaries**: Hierarchical, accordion-style task progression logs with Markdown support.
 - **🗣️ Conversational Interaction**: Native chat interface for direct instruction and feedback during task execution.
 - **🛠️ Worktree Management**: Automated `git worktree` isolation for concurrent task execution.

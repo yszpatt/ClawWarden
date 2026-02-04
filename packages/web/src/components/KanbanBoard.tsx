@@ -134,7 +134,7 @@ export function KanbanLane({ lane, tasks, selectedTaskId, onTaskClick, onAddTask
     });
 
     const laneIcons: Record<string, React.ReactNode> = {
-        'design': <Paintbrush size={16} />,
+        'plan': <Paintbrush size={16} />,
         'develop': <Code2 size={16} />,
         'test': <SearchCode size={16} />,
         'pending-merge': <GitMerge size={16} />,

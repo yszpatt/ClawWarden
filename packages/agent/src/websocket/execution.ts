@@ -156,8 +156,8 @@ interface ConversationUserInputMessage {
     content: string;
 }
 
-interface ConversationDesignStartMessage {
-    type: 'conversation.design_start';
+interface ConversationPlanStartMessage {
+    type: 'conversation.plan_start';
     taskId: string;
     projectId: string;
 }
@@ -168,7 +168,7 @@ interface ConversationExecuteStartMessage {
     projectId: string;
 }
 
-type ClientMessage = ExecuteMessage | InputMessage | StopMessage | ResizeMessage | AttachMessage | ConversationUserInputMessage | ConversationDesignStartMessage | ConversationExecuteStartMessage;
+type ClientMessage = ExecuteMessage | InputMessage | StopMessage | ResizeMessage | AttachMessage | ConversationUserInputMessage | ConversationPlanStartMessage | ConversationExecuteStartMessage;
 
 export async function executionHandler(fastify: FastifyInstance) {
     fastify.get('/ws/execute', { websocket: true }, (connection, _request) => {
@@ -289,7 +289,7 @@ export async function executionHandler(fastify: FastifyInstance) {
                             const task = data.tasks[taskIndex];
                             const outputType = getOutputTypeForLane(task.laneId);
                             const structuredOutput: StructuredOutput = {
-                                type: outputType,
+                                type: outputType as any,
                                 schemaVersion: '1.0',
                                 data: event.output,
                                 timestamp: new Date().toISOString()
@@ -333,8 +333,8 @@ export async function executionHandler(fastify: FastifyInstance) {
                     case 'conversation.user_input':
                         await handleConversationUserMessage(connection, message);
                         break;
-                    case 'conversation.design_start':
-                        await handleConversationDesignStart(connection, message);
+                    case 'conversation.plan_start':
+                        await handleConversationPlanStart(connection, message as ConversationPlanStartMessage);
                         break;
                     case 'conversation.execute_start':
                         await handleConversationExecuteStart(connection, message);
@@ -386,15 +386,15 @@ async function handleExecute(connection: SocketStream, message: ExecuteMessage) 
     let prompt: string | undefined;
     const isDevTestLane = task.laneId === 'develop' || task.laneId === 'test';
 
-    if (isDevTestLane && task.designPath) {
-        prompt = `请按照 @${task.designPath} 中的设计方案继续执行任务。`;
+    if (isDevTestLane && task.planPath) {
+        prompt = `请按照 @${task.planPath} 中的计划方案继续执行任务。`;
     } else if (!isDevTestLane && task.prompt) {
         prompt = task.prompt;
-    } else if (task.designPath) {
-        prompt = `请参考 @${task.designPath} 继续任务。`;
+    } else if (task.planPath) {
+        prompt = `请参考 @${task.planPath} 继续任务。`;
     }
 
-    if (!prompt) throw new Error('Task has no prompt or design document');
+    if (!prompt) throw new Error('Task has no prompt or plan document');
 
     // Update status
     task.status = 'running';
@@ -688,15 +688,15 @@ async function handleConversationUserMessage(
 }
 
 /**
- * Handle design generation through conversation panel
- * Streams the design process with immediate saving
+ * Handle plan generation through conversation panel
+ * Streams the plan process with immediate saving
  */
-async function handleConversationDesignStart(
+async function handleConversationPlanStart(
     connection: SocketStream,
-    message: ConversationDesignStartMessage
+    message: ConversationPlanStartMessage
 ) {
     const { taskId, projectId } = message;
-    console.log('[Execution] Design conversation start:', taskId);
+    console.log('[Execution] Plan conversation start:', taskId);
 
     const result = await findTask(taskId);
     if (!result) {
@@ -717,7 +717,7 @@ async function handleConversationDesignStart(
     task.status = 'running';
     task.updatedAt = new Date().toISOString();
     await writeProjectData(project.path, data);
-    console.log(`[Execution] Design task ${taskId} status set to running`);
+    console.log(`[Execution] Plan task ${taskId} status set to running`);
 
     // Send status update notification to frontend
     if (connection.socket.readyState === 1) {
@@ -741,11 +741,11 @@ async function handleConversationDesignStart(
         await conversationStorage.save(project.path, conversation);
     }
 
-    // Send system message indicating design is starting
+    // Send system message indicating plan generation is starting
     const systemMessage: ConversationMessage = {
         id: uuid(),
         role: 'system',
-        content: '[系统] 正在生成设计方案...',
+        content: '[系统] 正在生成计划方案...',
         type: 'info',
         timestamp: new Date().toISOString(),
     };
@@ -755,10 +755,10 @@ async function handleConversationDesignStart(
     const userPrompt = task.prompt || `## 任务需求\n\n**标题**: ${task.title}\n\n**描述**:\n${task.description}`;
 
     const config = await readGlobalConfig();
-    const lanePrompt = getLanePrompt('design', data, config.settings.lanePrompts || {});
+    const lanePrompt = getLanePrompt('plan', data, config.settings.lanePrompts || {});
 
     console.log('[Execution] Lane config:', {
-        laneId: 'design',
+        laneId: 'plan',
         projectLanes: data.lanes.map((l: any) => ({ id: l.id, name: l.name, hasSystemPrompt: !!l.systemPrompt })),
         globalLanePrompts: Object.keys(config.settings.lanePrompts || {}),
         lanePromptLength: lanePrompt.length,
@@ -769,7 +769,7 @@ async function handleConversationDesignStart(
         ? `${lanePrompt}\n\n---\n\n${userPrompt}`
         : userPrompt;
 
-    console.log('[Execution] Starting design generation with streaming, sessionId:', sessionId);
+    console.log('[Execution] Starting plan generation with streaming, sessionId:', sessionId);
     console.log('[Execution] Lane prompt length:', lanePrompt.length, 'User prompt length:', userPrompt.length);
 
     // Create message group for this response
@@ -792,7 +792,7 @@ async function handleConversationDesignStart(
                 resume: sessionId,
             },
         })) {
-            console.log('[Execution] Design message type:', sdkMessage.type);
+            console.log('[Execution] Plan message type:', sdkMessage.type);
 
             // Track session ID
             if ((sdkMessage as any).session_id) {
@@ -859,7 +859,7 @@ async function handleConversationDesignStart(
 
             // Handle result
             else if (sdkMessage.type === 'result') {
-                console.log('[Execution] Design generation completed, content length:', currentTextContent.length, 'subtype:', (sdkMessage as any).subtype);
+                console.log('[Execution] Plan generation completed, content length:', currentTextContent.length, 'subtype:', (sdkMessage as any).subtype);
 
                 // Check if execution was successful
                 const subtype = (sdkMessage as any).subtype;
@@ -892,7 +892,7 @@ async function handleConversationDesignStart(
                     };
                     await sendAndSaveMessage(connection, taskId, projectPath, errorMsg);
 
-                    console.log('[Execution] Design generation failed:', errorMessage);
+                    console.log('[Execution] Plan generation failed:', errorMessage);
                 } else {
                     // Success - save design and move to next lane
                     // Send chunk_end
@@ -902,17 +902,17 @@ async function handleConversationDesignStart(
                         groupId,
                     } as ConversationWsMessage));
 
-                    // Only save design if there's actual content
+                    // Only save plan if there's actual content
                     if (currentTextContent.trim().length > 0) {
-                        // Save design to project directory (not worktree) so it persists after merge
-                        const designsDir = path.join(project.path, '.clawwarden', 'designs');
-                        await fs.mkdir(designsDir, { recursive: true });
-                        const designFileName = `${task.id}-design.md`;
-                        const designPath = path.join(designsDir, designFileName);
-                        await fs.writeFile(designPath, currentTextContent, 'utf-8');
+                        // Save plan to project directory (not worktree) so it persists after merge
+                        const plansDir = path.join(project.path, '.clawwarden', 'plans');
+                        await fs.mkdir(plansDir, { recursive: true });
+                        const planFileName = `${task.id}-plan.md`;
+                        const planPath = path.join(plansDir, planFileName);
+                        await fs.writeFile(planPath, currentTextContent, 'utf-8');
 
-                        // Store designPath relative to project directory
-                        task.designPath = `.clawwarden/designs/${designFileName}`;
+                        // Store planPath relative to project directory
+                        task.planPath = `.clawwarden/plans/${planFileName}`;
 
                         // Update task status and move to develop lane
                         task.status = 'idle';
@@ -934,21 +934,21 @@ async function handleConversationDesignStart(
                         const completeMessage: ConversationMessage = {
                             id: uuid(),
                             role: 'system',
-                            content: `[系统] 设计方案已生成并保存到: ${task.designPath}，任务已移至开发泳道`,
+                            content: `[系统] 计划方案已生成并保存到: ${task.planPath}，任务已移至开发泳道`,
                             type: 'info',
                             timestamp: new Date().toISOString(),
                         };
                         await sendAndSaveMessage(connection, taskId, project.path, completeMessage);
 
                         connection.socket.send(JSON.stringify({
-                            type: 'conversation.design_complete',
+                            type: 'conversation.plan_complete',
                             taskId,
-                            designPath: task.designPath,
+                            planPath: task.planPath,
                             content: completeMessage.content,
                         } as ConversationWsMessage));
 
-                        // Also save structured-output if design contains structured data
-                        const structuredOutput = parseDesignToStructuredOutput(currentTextContent, task);
+                        // Also save structured-output if plan contains structured data
+                        const structuredOutput = parsePlanToStructuredOutput(currentTextContent, task);
                         if (structuredOutput) {
                             // task.structuredOutput = structuredOutput; // Don't save to task object
                             await writeTaskSummary(project.path, taskId, structuredOutput);
@@ -960,7 +960,7 @@ async function handleConversationDesignStart(
                             }));
                         }
 
-                        console.log('[Execution] Design saved, task updated, conversation persisted');
+                        console.log('[Execution] Plan saved, task updated, conversation persisted');
                     } else {
                         // No content generated - mark as failed
                         task.status = 'failed';
@@ -970,7 +970,7 @@ async function handleConversationDesignStart(
                         const errorMsg: ConversationMessage = {
                             id: uuid(),
                             role: 'system',
-                            content: '错误: 未生成任何设计方案内容',
+                            content: '错误: 未生成任何计划方案内容',
                             type: 'error',
                             timestamp: new Date().toISOString(),
                         };
@@ -980,7 +980,7 @@ async function handleConversationDesignStart(
             }
         }
     } catch (error: any) {
-        console.error('[Execution] Design generation error:', error);
+        console.error('[Execution] Plan generation error:', error);
 
         // Update task status to failed
         const result = await findTask(taskId);
@@ -988,7 +988,7 @@ async function handleConversationDesignStart(
             result.task.status = 'failed';
             result.task.updatedAt = new Date().toISOString();
             await writeProjectData(result.project.path, result.data);
-            console.log(`[Execution] Design task ${taskId} status set to failed`);
+            console.log(`[Execution] Plan task ${taskId} status set to failed`);
         }
 
         // Save error to conversation
@@ -1035,13 +1035,13 @@ async function handleConversationExecuteStart(
 
     // Route to appropriate handler based on lane
     switch (laneId) {
-        case 'design':
-            console.log('[Execution] Design lane, using handleConversationDesignStart');
-            await handleConversationDesignStart(connection, {
-                type: 'conversation.design_start',
+        case 'plan':
+            console.log('[Execution] Plan lane, using handleConversationPlanStart');
+            await handleConversationPlanStart(connection, {
+                type: 'conversation.plan_start',
                 taskId,
                 projectId,
-            } as ConversationDesignStartMessage);
+            } as ConversationPlanStartMessage);
             break;
         case 'develop':
             console.log('[Execution] Routing develop lane to handleConversationDevelopStart');
@@ -1162,26 +1162,26 @@ async function handleLaneExecutionWithAgent(
 
     // Build prompt
     // For develop/test lanes: only use lane prompt + design doc reference (no user task description)
-    // For design lane: use lane prompt + user prompt
+    // For plan lane: use lane prompt + user prompt
     const config = await readGlobalConfig();
     const lanePrompt = getLanePrompt(task.laneId, data, config.settings.lanePrompts || {});
 
     let prompt: string;
     if (task.laneId === 'develop' || task.laneId === 'test') {
-        // Develop/Test lanes: only lane prompt + design doc
-        if (task.designPath) {
-            // Design file is in project directory, need to reference from worktree
+        // Develop/Test lanes: only lane prompt + plan doc
+        if (task.planPath) {
+            // Plan file is in project directory, need to reference from worktree
             // worktree path: {projectPath}/.worktrees/{taskId}
-            // design file: {projectPath}/.clawwarden/designs/{taskId}-design.md
-            // relative path from worktree: ../../.clawwarden/designs/{taskId}-design.md
-            const designFileName = task.designPath.split('/').pop(); // Get {taskId}-design.md
-            const relativeDesignPath = `../../.clawwarden/designs/${designFileName}`;
-            prompt = `${lanePrompt}\n\n请按照 @${relativeDesignPath} 中的设计方案执行任务。`;
+            // plan file: {projectPath}/.clawwarden/plans/{taskId}-plan.md
+            // relative path from worktree: ../../.clawwarden/plans/{taskId}-plan.md
+            const planFileName = task.planPath.split('/').pop(); // Get {taskId}-plan.md
+            const relativePlanPath = `../../.clawwarden/plans/${planFileName}`;
+            prompt = `${lanePrompt}\n\n请按照 @${relativePlanPath} 中的计划方案执行任务。`;
         } else {
             prompt = lanePrompt || '请继续执行任务。';
         }
     } else {
-        // Design lane: lane prompt + user prompt
+        // Plan lane: lane prompt + user prompt
         const userPrompt = task.prompt || `## 任务\n\n**标题**: ${task.title}\n\n**描述**:\n${task.description}`;
         prompt = lanePrompt
             ? `${lanePrompt}\n\n---\n\n${userPrompt}`
@@ -1192,7 +1192,7 @@ async function handleLaneExecutionWithAgent(
     const outputFormat = getSchemaForLane(task.laneId);
 
     // Determine allowed tools based on task's lane
-    const allowedTools = task.laneId === 'design'
+    const allowedTools = task.laneId === 'plan'
         ? ['Read', 'Glob', 'Grep']
         : ['Bash', 'Read', 'Edit', 'Glob', 'Grep', 'Find', 'Write'];
 
@@ -1502,7 +1502,7 @@ async function handleLaneExecutionWithAgent(
 
                     const outputType = getOutputTypeForLane(task.laneId);
                     const structuredOutput: StructuredOutput = {
-                        type: outputType,
+                        type: outputType as any,
                         schemaVersion: '1.0',
                         data: (sdkMessage as any).structured_output,
                         timestamp: new Date().toISOString(),
@@ -1608,9 +1608,9 @@ async function handleLaneExecutionWithAgent(
 }
 
 /**
- * Parse design markdown content to structured output
+ * Parse plan markdown content to structured output
  */
-function parseDesignToStructuredOutput(content: string, task: Task): StructuredOutput | null {
+function parsePlanToStructuredOutput(content: string, task: Task): StructuredOutput | null {
     // Simple extraction of key sections from markdown
     const sections: Record<string, string> = {};
 
@@ -1641,7 +1641,7 @@ function parseDesignToStructuredOutput(content: string, task: Task): StructuredO
     // Build structured output
     if (Object.keys(sections).length > 0) {
         return {
-            type: 'design',
+            type: 'plan',
             schemaVersion: '1.0',
             timestamp: new Date().toISOString(),
             data: {
@@ -1650,7 +1650,7 @@ function parseDesignToStructuredOutput(content: string, task: Task): StructuredO
                     title: task.title,
                 },
                 sections,
-                summary: `设计方案包含 ${Object.keys(sections).length} 个部分`,
+                summary: `计划方案包含 ${Object.keys(sections).length} 个部分`,
             }
         };
     }

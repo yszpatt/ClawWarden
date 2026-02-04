@@ -21,14 +21,14 @@ export interface ClaudeSession {
 
 // 结构化输出类型
 export interface StructuredOutput {
-    type: 'design' | 'development' | 'testing' | 'analysis' | 'generic';
+    type: 'plan' | 'development' | 'testing' | 'analysis' | 'generic';
     schemaVersion: string;
     data: unknown;
     timestamp: string;
 }
 
-// 设计方案的结构化输出
-export interface DesignOutput {
+// 计划方案的结构化输出
+export interface PlanOutput {
     summary: string;
     approach: string;
     components: Array<{
@@ -86,7 +86,7 @@ export interface Task {
     executionLogs?: ExecutionLog[];
     worktree?: Worktree;
     claudeSession?: ClaudeSession;  // Claude Code session for lifecycle
-    designPath?: string;  // 设计方案文件路径
+    planPath?: string;  // 计划方案文件路径
     structuredOutput?: StructuredOutput;  // 结构化输出
     metadata?: Record<string, unknown>;
 }

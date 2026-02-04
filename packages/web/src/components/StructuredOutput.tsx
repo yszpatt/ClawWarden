@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { StructuredOutput, DesignOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
+import type { StructuredOutput, PlanOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -83,7 +83,7 @@ function SingleOutputViewer({ output, defaultExpanded = false }: { output: Struc
                     </span>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                         <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                            {data.summary || (output.type === 'design' ? '设计方案' : output.type === 'development' ? '开发变更' : '测试报告')}
+                            {data.summary || (output.type === 'plan' ? '计划方案' : output.type === 'development' ? '开发变更' : '测试报告')}
                         </span>
                         <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', opacity: 0.6 }}>
                             {new Date(output.timestamp).toLocaleString()}
@@ -121,7 +121,7 @@ function SingleOutputViewer({ output, defaultExpanded = false }: { output: Struc
 
 function getOutputTypeColor(type: string): string {
     switch (type) {
-        case 'design': return '#8B5CF6';
+        case 'plan': return '#8B5CF6';
         case 'development': return '#10B981';
         case 'testing': return '#F59E0B';
         default: return '#6B7280';
@@ -130,8 +130,8 @@ function getOutputTypeColor(type: string): string {
 
 function renderOutputContent(type: string, data: any) {
     switch (type) {
-        case 'design':
-            return renderDesignOutput(data);
+        case 'plan':
+            return renderPlanOutput(data);
         case 'development':
             return renderDevelopmentOutput(data);
         case 'testing':
@@ -162,7 +162,7 @@ function renderGenericOutput(data: any) {
     );
 }
 
-function renderDesignOutput(data: DesignOutput) {
+function renderPlanOutput(data: PlanOutput) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             {/* Sections (Parsed from Markdown) */}
@@ -195,7 +195,7 @@ function renderDesignOutput(data: DesignOutput) {
                         <div>
                             <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>组件设计</h4>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                {data.components.map((c, i) => (
+                                {data.components.map((c: any, i: number) => (
                                     <div key={i} style={{ padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
                                         <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{c.name}</div>
                                         <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{c.description}</div>

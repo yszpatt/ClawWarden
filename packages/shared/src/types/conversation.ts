@@ -59,7 +59,7 @@ export interface SystemMessage extends BaseMessage {
 }
 
 export type MessageStatus = 'streaming' | 'complete' | 'error';
-export type SystemMessageType = 'info' | 'warning' | 'error';
+export type SystemMessageType = 'info' | 'warning' | 'error' | 'success';
 
 export interface ToolCall {
     name: string;
@@ -84,11 +84,11 @@ export interface Attachment {
 
 // WebSocket message types for conversation
 export interface ConversationWsMessage {
-    type: 'conversation.user_input' | 'conversation.execute_start' | 'conversation.design_start' |
-           'conversation.chunk_start' | 'conversation.chunk' | 'conversation.chunk_end' |
-           'conversation.thinking' | 'conversation.tool_call_start' | 'conversation.tool_call_output' |
-           'conversation.tool_call_end' | 'conversation.error' | 'conversation.design_complete' |
-           'conversation.execute_complete' | 'task_status' | 'structured-output';
+    type: 'conversation.user_input' | 'conversation.execute_start' | 'conversation.plan_start' |
+    'conversation.chunk_start' | 'conversation.chunk' | 'conversation.chunk_end' |
+    'conversation.thinking' | 'conversation.tool_call_start' | 'conversation.tool_call_output' |
+    'conversation.tool_call_end' | 'conversation.error' | 'conversation.plan_complete' |
+    'conversation.execute_complete' | 'task_status' | 'structured-output';
     taskId: string;
     projectId?: string;
     messageId?: string;
@@ -96,7 +96,7 @@ export interface ConversationWsMessage {
     content?: string;
     toolCall?: ToolCall;
     error?: string;
-    designPath?: string;
+    planPath?: string;
     structuredOutput?: unknown;
     output?: unknown;
     status?: string;

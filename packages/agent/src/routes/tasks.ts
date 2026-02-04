@@ -144,13 +144,15 @@ export async function taskRoutes(fastify: FastifyInstance) {
             console.log(`[Tasks] Could not delete conversation session: ${error.message}`);
         }
 
-        // Delete design file if exists
-        try {
-            const designPath = path.join(project.path, '.clawwarden', 'designs', `${taskId}-design.md`);
-            await fs.unlink(designPath);
-            console.log(`[Tasks] Deleted design file for task: ${taskId}`);
-        } catch (error: any) {
-            // Design file may not exist, ignore
+        // Delete plan file if exists
+        if (task?.planPath) {
+            try {
+                const planFullPath = path.join(project.path, task.planPath);
+                await fs.unlink(planFullPath);
+                console.log(`[Tasks] Deleted plan file for task: ${taskId}`);
+            } catch (error: any) {
+                // Plan file may not exist, ignore
+            }
         }
 
         data.tasks = data.tasks.filter(t => t.id !== taskId);

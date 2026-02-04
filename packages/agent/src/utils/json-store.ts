@@ -52,7 +52,49 @@ export async function readProjectData(projectPath: string): Promise<ProjectData>
         throw new Error(`Project not initialized: ${projectPath}`);
     }
     const content = await readFile(filePath, 'utf-8');
-    return JSON.parse(content);
+    const data = JSON.parse(content) as ProjectData;
+
+    // Data migration: design -> plan
+    let migrated = false;
+
+    // 1. Migrate tasks
+    if (data.tasks) {
+        data.tasks.forEach(task => {
+            if (task.laneId === 'design' as any) {
+                task.laneId = 'plan';
+                migrated = true;
+            }
+            // Field rename: designPath -> planPath
+            if ((task as any).designPath && !task.planPath) {
+                task.planPath = (task as any).designPath;
+                delete (task as any).designPath;
+                migrated = true;
+            }
+        });
+    }
+
+    // 2. Migrate lanes configuration
+    if (data.lanes) {
+        const designLaneIndex = data.lanes.findIndex(l => l.id === 'design' as any);
+        if (designLaneIndex !== -1) {
+            data.lanes[designLaneIndex].id = 'plan';
+            data.lanes[designLaneIndex].name = '计划';
+            migrated = true;
+        }
+
+        // Ensure plan lane exists if missing (but develop exists)
+        if (!data.lanes.find(l => l.id === 'plan')) {
+            data.lanes.unshift({ id: 'plan', name: '计划', order: -1, color: '#8B5CF6' });
+            migrated = true;
+        }
+    }
+
+    if (migrated) {
+        console.log(`[Migration] Migrated data for project: ${projectPath}`);
+        await writeProjectData(projectPath, data);
+    }
+
+    return data;
 }
 
 export async function writeProjectData(projectPath: string, data: ProjectData): Promise<void> {

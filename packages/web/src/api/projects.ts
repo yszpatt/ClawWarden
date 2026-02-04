@@ -91,30 +91,30 @@ export async function deleteTask(projectId: string, taskId: string): Promise<voi
     return res.json();
 }
 
-export async function fetchDesign(
+export async function fetchPlan(
     projectId: string,
     taskId: string
-): Promise<{ designPath: string; content: string }> {
-    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}/design`);
+): Promise<{ planPath: string; content: string }> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}/plan`);
     if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: 'Failed to fetch design' }));
+        const error = await res.json().catch(() => ({ message: 'Failed to fetch plan' }));
         throw new Error(error.message);
     }
     return res.json();
 }
 
-export async function updateDesign(
+export async function updatePlan(
     projectId: string,
     taskId: string,
     content: string
-): Promise<{ success: boolean; designPath: string }> {
-    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}/design`, {
+): Promise<{ success: boolean; planPath: string }> {
+    const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks/${taskId}/plan`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
     });
     if (!res.ok) {
-        const error = await res.json().catch(() => ({ message: 'Failed to update design' }));
+        const error = await res.json().catch(() => ({ message: 'Failed to update plan' }));
         throw new Error(error.message);
     }
     return res.json();

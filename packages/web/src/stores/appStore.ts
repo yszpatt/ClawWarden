@@ -32,7 +32,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     setCurrentProject: (project) => set({ currentProject: project }),
 
-    setProjectData: (data) => set({ projectData: data }),
+    setProjectData: (data) => {
+        if (data) {
+            // Data migration: design -> plan
+            if (data.tasks) {
+                data.tasks = data.tasks.map(t =>
+                    t.laneId === 'design' as any ? { ...t, laneId: 'plan' } : t
+                );
+            }
+            if (data.lanes) {
+                data.lanes = data.lanes.map(l =>
+                    l.id === 'design' as any ? { ...l, id: 'plan', name: '计划' } : l
+                );
+            }
+        }
+        set({ projectData: data });
+    },
 
     selectTask: (taskId) => set({ selectedTaskId: taskId, sidebarOpen: !!taskId }),
 

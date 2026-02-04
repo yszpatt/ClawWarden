@@ -4,7 +4,7 @@ import { Square, Save, X, Trash2, GitMerge, Palette, Edit2, Info, Database, GitB
 import { useTerminalConnection } from './Terminal';
 import { ConversationPanel } from './conversation/ConversationPanel';
 import { useAppStore } from '../stores/appStore';
-import { fetchDesign, updateDesign, mergeWorktree, fetchProjectData, fetchTask, fetchTaskSummary } from '../api/projects';
+import { fetchPlan, updatePlan, mergeWorktree, fetchProjectData, fetchTask, fetchTaskSummary } from '../api/projects';
 import { connectionManager } from '../services/ConnectionManager';
 import { DEFAULT_LANES } from '@clawwarden/shared';
 
@@ -23,13 +23,13 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     const isRunning = task.status === 'running';
     const [isRunningState, setIsRunningState] = useState(isRunning);
     const taskStatusRef = useRef(task.status);
-    const [isGeneratingDesign, setIsGeneratingDesign] = useState(false);
-    const [designContent, setDesignContent] = useState<string | null>(null);
-    const [isEditingDesign, setIsEditingDesign] = useState(false);
-    const [editedDesignContent, setEditedDesignContent] = useState('');
+    const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+    const [planContent, setPlanContent] = useState<string | null>(null);
+    const [isEditingPlan, setIsEditingPlan] = useState(false);
+    const [editedPlanContent, setEditedPlanContent] = useState('');
     const [isMerging, setIsMerging] = useState(false);
     const [structuredOutputs, setStructuredOutputs] = useState<StructuredOutput[]>([]);
-    const [activeTab, setActiveTab] = useState<'conversation' | 'design' | 'summary'>('conversation');
+    const [activeTab, setActiveTab] = useState<'conversation' | 'plan' | 'summary'>('conversation');
     const [fetchedTask, setFetchedTask] = useState<Task | null>(null);
 
     const { updateTask, removeTask, setProjectData, currentProject } = useAppStore();
@@ -48,10 +48,10 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         stop,
         disconnect,
     } = useTerminalConnection(projectId, task.id, {
-        onDesignComplete: (content) => {
-            setDesignContent(content);
-            setEditedDesignContent(content);
-            setIsGeneratingDesign(false);
+        onPlanComplete: (content) => {
+            setPlanContent(content);
+            setEditedPlanContent(content);
+            setIsGeneratingPlan(false);
         },
         onStatusChange: (status) => {
             onStatusChange?.(status as Task['status']);
@@ -93,28 +93,28 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
 
     useEffect(() => {
         const t = fetchedTask || task;
-        if (t.designPath) {
-            fetchDesign(projectId, task.id)
+        if (t.planPath) {
+            fetchPlan(projectId, task.id)
                 .then(r => {
-                    setDesignContent(r.content);
-                    setEditedDesignContent(r.content);
+                    setPlanContent(r.content);
+                    setEditedPlanContent(r.content);
                 })
-                .catch(err => console.log('[TaskDetail] Design load error:', err));
+                .catch(err => console.log('[TaskDetail] Plan load error:', err));
         }
-    }, [projectId, task.id, fetchedTask?.designPath]);
+    }, [projectId, task.id, fetchedTask?.planPath]);
 
     useEffect(() => () => disconnect(), []);
 
-    const handleGenerateDesign = () => {
-        if (isGeneratingDesign) return;
-        setIsGeneratingDesign(true);
+    const handleGeneratePlan = () => {
+        if (isGeneratingPlan) return;
+        setIsGeneratingPlan(true);
         setActiveTab('conversation');
         connectionManager.connect();
-        connectionManager.send({ type: 'conversation.design_start', taskId: task.id, projectId });
+        connectionManager.send({ type: 'conversation.plan_start', taskId: task.id, projectId });
     };
 
     const handleExecute = () => {
-        if (!task.prompt && !task.designPath) return alert('任务没有 Prompt 或设计方案，无法执行');
+        if (!task.prompt && !task.planPath) return alert('任务没有 Prompt 或计划方案，无法执行');
         setActiveTab('conversation');
         connectionManager.connect();
         connectionManager.send({ type: 'conversation.execute_start', taskId: task.id, projectId });
@@ -175,16 +175,16 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         const laneId = task.laneId;
         const themeColor = getLaneColor(laneId);
 
-        if (laneId === 'design') {
+        if (laneId === 'plan') {
             return (
                 <button
                     className="btn-unified primary"
-                    onClick={handleGenerateDesign}
-                    disabled={isGeneratingDesign}
+                    onClick={handleGeneratePlan}
+                    disabled={isGeneratingPlan}
                     style={{ width: '100%', padding: '0.75rem', background: themeColor, borderColor: themeColor }}
                 >
                     <Palette size={16} />
-                    {isGeneratingDesign ? '正在生成设计方案...' : '生成设计方案'}
+                    {isGeneratingPlan ? '正在生成计划方案...' : '生成计划方案'}
                 </button>
             );
         }
@@ -201,7 +201,7 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                 <button
                     className="btn-unified primary"
                     onClick={handleExecute}
-                    disabled={!task.prompt && !task.designPath}
+                    disabled={!task.prompt && !task.planPath}
                     style={{ width: '100%', padding: '0.75rem', background: themeColor, borderColor: themeColor }}
                 >
                     {laneId === 'test' ? <ShieldCheck size={16} /> : <Code2 size={16} />}
@@ -234,16 +234,16 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                     projectId={projectId}
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
-                    designContent={designContent}
+                    designContent={planContent}
                     onSaveDesign={async (content) => {
-                        await updateDesign(projectId, task.id, content);
-                        setDesignContent(content);
-                        setIsEditingDesign(false);
+                        await updatePlan(projectId, task.id, content);
+                        setPlanContent(content);
+                        setIsEditingPlan(false);
                     }}
-                    isEditingDesign={isEditingDesign}
-                    setIsEditingDesign={setIsEditingDesign}
-                    editedDesignContent={editedDesignContent}
-                    setEditedDesignContent={setEditedDesignContent}
+                    isEditingDesign={isEditingPlan}
+                    setIsEditingDesign={setIsEditingPlan}
+                    editedDesignContent={editedPlanContent}
+                    setEditedDesignContent={setEditedPlanContent}
                     structuredOutput={structuredOutputs}
                 />
             </div>

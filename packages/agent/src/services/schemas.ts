@@ -1,4 +1,4 @@
-import type { DesignOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
+import type { PlanOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
 
 /**
  * JSON Schemas for structured outputs from Claude Agent SDK
@@ -6,9 +6,9 @@ import type { DesignOutput, DevelopmentOutput, TestingOutput } from '@clawwarden
  */
 
 /**
- * Design output schema - for design lane tasks
+ * Plan output schema - for plan lane tasks
  */
-export const designOutputSchema = {
+export const planOutputSchema = {
     type: 'object',
     properties: {
         summary: {
@@ -185,8 +185,8 @@ export const genericOutputSchema = {
  */
 export function getSchemaForLane(laneId: string) {
     switch (laneId) {
-        case 'design':
-            return { type: 'json_schema', schema: designOutputSchema } as const;
+        case 'plan':
+            return { type: 'json_schema', schema: planOutputSchema } as const;
         case 'develop':
             return { type: 'json_schema', schema: developmentOutputSchema } as const;
         case 'test':
@@ -199,10 +199,10 @@ export function getSchemaForLane(laneId: string) {
 /**
  * Get the output type for a given lane
  */
-export function getOutputTypeForLane(laneId: string): 'design' | 'development' | 'testing' | 'generic' {
+export function getOutputTypeForLane(laneId: string): 'plan' | 'development' | 'testing' | 'generic' {
     switch (laneId) {
-        case 'design':
-            return 'design';
+        case 'plan':
+            return 'plan';
         case 'develop':
             return 'development';
         case 'test':
