@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { Task, StructuredOutput } from '@clawwarden/shared';
 import { Square, Save, X, Trash2, GitMerge, Palette, Edit2, Info, Database, GitBranch, Code2, ShieldCheck } from 'lucide-react';
-import { useTerminalConnection, type TerminalRef } from './Terminal';
+import { useTerminalConnection } from './Terminal';
 import { ConversationPanel } from './conversation/ConversationPanel';
 import { useAppStore } from '../stores/appStore';
 import { fetchDesign, updateDesign, mergeWorktree, fetchProjectData, fetchTask, fetchTaskSummary } from '../api/projects';
@@ -29,9 +29,8 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     const [editedDesignContent, setEditedDesignContent] = useState('');
     const [isMerging, setIsMerging] = useState(false);
     const [structuredOutputs, setStructuredOutputs] = useState<StructuredOutput[]>([]);
-    const [activeTab, setActiveTab] = useState<'conversation' | 'terminal' | 'design' | 'summary'>('conversation');
+    const [activeTab, setActiveTab] = useState<'conversation' | 'design' | 'summary'>('conversation');
     const [fetchedTask, setFetchedTask] = useState<Task | null>(null);
-    const terminalRef = useRef<TerminalRef>(null);
 
     const { updateTask, removeTask, setProjectData, currentProject } = useAppStore();
 
@@ -46,13 +45,8 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     }, [task.status, task.laneId, task.updatedAt]);
 
     const {
-        connect,
-        attach,
-        sendInput,
         stop,
         disconnect,
-        setTerminalRef,
-        handleResize
     } = useTerminalConnection(projectId, task.id, {
         onDesignComplete: (content) => {
             setDesignContent(content);
@@ -67,17 +61,6 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         }
     });
 
-    const handleTerminalData = useCallback((data: string) => {
-        sendInput(data);
-    }, [sendInput]);
-
-    const handleTerminalResize = useCallback((cols: number, rows: number) => {
-        handleResize(cols, rows);
-    }, [handleResize]);
-
-    useEffect(() => {
-        if (terminalRef.current) setTerminalRef(terminalRef.current);
-    }, [terminalRef.current, setTerminalRef]);
 
     useEffect(() => {
         setIsRunningState(task.status === 'running');
@@ -249,9 +232,6 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                 <ConversationPanel
                     taskId={task.id}
                     projectId={projectId}
-                    terminalRef={terminalRef}
-                    onTerminalData={handleTerminalData}
-                    onTerminalResize={handleTerminalResize}
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
                     designContent={designContent}

@@ -175,25 +175,6 @@ export async function executionHandler(fastify: FastifyInstance) {
         let currentTaskId: string | null = null;
 
         // Forward Agent events to client
-        const outputListener = (event: { taskId: string, data: string }) => {
-            if (currentTaskId && event.taskId === currentTaskId && connection.socket.readyState === 1) {
-                connection.socket.send(JSON.stringify({
-                    type: 'output',
-                    taskId: event.taskId,
-                    data: event.data
-                }));
-            }
-        };
-
-        const logListener = (event: { taskId: string, message: string }) => {
-            if (currentTaskId && event.taskId === currentTaskId && connection.socket.readyState === 1) {
-                connection.socket.send(JSON.stringify({
-                    type: 'output',
-                    taskId: event.taskId,
-                    data: `\x1b[90m${event.message}\x1b[0m\r\n` // Gray color for logs
-                }));
-            }
-        };
 
         const errorListener = (event: { taskId: string, error: Error }) => {
             if (currentTaskId && event.taskId === currentTaskId && connection.socket.readyState === 1) {
@@ -331,8 +312,6 @@ export async function executionHandler(fastify: FastifyInstance) {
         };
 
         // Register listeners
-        agentManager.on('output', outputListener);
-        agentManager.on('log', logListener);
         agentManager.on('error', errorListener);
         agentManager.on('statusUpdate', statusUpdateListener);
         agentManager.on('sessionStart', sessionStartListener);
@@ -348,22 +327,8 @@ export async function executionHandler(fastify: FastifyInstance) {
                         currentTaskId = message.taskId;
                         await handleExecute(connection, message);
                         break;
-                    case 'attach':
-                        currentTaskId = message.taskId;
-                        await handleAttach(connection, message);
-                        break;
-                    case 'input':
-                        if (currentTaskId) {
-                            handleInput(currentTaskId, message.data);
-                        } else {
-                            if (message.taskId) handleInput(message.taskId, message.data);
-                        }
-                        break;
                     case 'stop':
                         if (message.taskId) handleStop(message.taskId);
-                        break;
-                    case 'resize':
-                        // Agent SDK doesn't support PTY resize
                         break;
                     case 'conversation.user_input':
                         await handleConversationUserMessage(connection, message);
@@ -385,8 +350,6 @@ export async function executionHandler(fastify: FastifyInstance) {
         });
 
         connection.socket.on('close', () => {
-            agentManager.off('output', outputListener);
-            agentManager.off('log', logListener);
             agentManager.off('error', errorListener);
             agentManager.off('statusUpdate', statusUpdateListener);
             agentManager.off('sessionStart', sessionStartListener);

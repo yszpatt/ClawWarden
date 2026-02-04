@@ -11,11 +11,6 @@ export interface WsMessage {
     type: string;
     sessionId?: string;
     taskId?: string;
-    data?: string;
-    exitCode?: number;
-    bufferedOutput?: string;
-    claudeSessionId?: string;
-    message?: string;
     output?: unknown;  // For structured-output
     designPath?: string;
     content?: string;  // For design-complete
@@ -32,22 +27,15 @@ export interface WsMessage {
 
 type MessageHandler = (message: WsMessage) => void;
 
-// Maximum log cache size per task (50KB)
-const MAX_LOG_CACHE_SIZE = 50 * 1024;
-
 export class ConnectionManager {
     private static instance: ConnectionManager;
     private ws: WebSocket | null = null;
     private subscribers = new Map<string, Set<MessageHandler>>();  // Multiple handlers per taskId
-    private logCache = new Map<string, string>();
-    private sessionIdByTask = new Map<string, string>();
     private pendingMessages: object[] = [];
     private reconnectAttempts = 0;
     private maxReconnectAttempts = 5;
     private reconnectDelay = 1000;
     private isConnecting = false;
-    private attachedTasks = new Set<string>();  // Track tasks that received bufferedOutput
-    private pendingAttach = new Set<string>();  // Track tasks with pending/sent attach
 
     private constructor() { }
 
@@ -167,20 +155,6 @@ export class ConnectionManager {
     }
 
     /**
-     * Get cached log output for a task
-     */
-    getLogCache(taskId: string): string {
-        return this.logCache.get(taskId) || '';
-    }
-
-    /**
-     * Get session ID for a task
-     */
-    getSessionId(taskId: string): string | null {
-        return this.sessionIdByTask.get(taskId) || null;
-    }
-
-    /**
      * Check if WebSocket is connected
      */
     isConnected(): boolean {
@@ -217,53 +191,6 @@ export class ConnectionManager {
         };
     }
 
-    /**
-     * Check if a task has already received bufferedOutput (to prevent duplicates)
-     */
-    hasReceivedBuffer(taskId: string): boolean {
-        return this.attachedTasks.has(taskId);
-    }
-
-    /**
-     * Mark a task as having received bufferedOutput
-     */
-    markBufferReceived(taskId: string): void {
-        this.attachedTasks.add(taskId);
-    }
-
-    /**
-     * Clear buffer received flag (e.g., when starting fresh)
-     */
-    clearBufferReceived(taskId: string): void {
-        console.log('[ConnectionManager] clearBufferReceived:', taskId);
-        this.attachedTasks.delete(taskId);
-        this.pendingAttach.delete(taskId);  // Also clear pending attach
-    }
-
-    /**
-     * Check if attach has already been sent for this task (prevents duplicate attach calls)
-     */
-    hasPendingAttach(taskId: string): boolean {
-        const has = this.pendingAttach.has(taskId);
-        console.log('[ConnectionManager] hasPendingAttach:', taskId, '=', has, 'set:', Array.from(this.pendingAttach));
-        return has;
-    }
-
-    /**
-     * Mark attach as sent for this task
-     */
-    markAttachSent(taskId: string): void {
-        console.log('[ConnectionManager] markAttachSent:', taskId);
-        this.pendingAttach.add(taskId);
-    }
-
-    /**
-     * Clear pending attach status (e.g. when component unmounts)
-     */
-    clearPendingAttach(taskId: string): void {
-        console.log('[ConnectionManager] clearPendingAttach:', taskId);
-        this.pendingAttach.delete(taskId);
-    }
 
     /**
      * Handle incoming WebSocket message
@@ -276,28 +203,6 @@ export class ConnectionManager {
         console.log('[ConnectionManager] Received message type:', message.type, 'taskId:', message.taskId);
 
         const taskId = message.taskId;
-
-        // Track session IDs
-        if (message.type === 'started' || message.type === 'attached' || message.type === 'resumed') {
-            if (message.sessionId && taskId) {
-                this.sessionIdByTask.set(taskId, message.sessionId);
-            }
-        }
-
-        // Cache output data
-        if (message.type === 'output' && message.data && taskId) {
-            const existing = this.logCache.get(taskId) || '';
-            let newCache = existing + message.data;
-            if (newCache.length > MAX_LOG_CACHE_SIZE) {
-                newCache = newCache.slice(-MAX_LOG_CACHE_SIZE);
-            }
-            this.logCache.set(taskId, newCache);
-        }
-
-        // Cache buffered output from attach
-        if (message.type === 'attached' && message.bufferedOutput && taskId) {
-            this.logCache.set(taskId, message.bufferedOutput);
-        }
 
         // Dispatch to all subscribers for this task
         if (taskId) {

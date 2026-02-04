@@ -1,12 +1,10 @@
 import { useState, useEffect, memo } from 'react';
-import { MessageSquare, Terminal, FileText, Edit2, Save, X, Activity } from 'lucide-react';
+import { MessageSquare, FileText, Edit2, Save, X, Activity } from 'lucide-react';
 import { useConversation } from '../../hooks/useConversation';
 import { connectionManager } from '../../services/ConnectionManager';
-import type { TerminalRef } from '../Terminal';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
 import { QuickActions } from './QuickActions';
-import { Terminal as TerminalComponent } from '../Terminal';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
 import { StructuredOutputViewer } from '../StructuredOutput';
 import type { StructuredOutput } from '@clawwarden/shared';
@@ -14,13 +12,10 @@ import type { StructuredOutput } from '@clawwarden/shared';
 interface ConversationPanelProps {
     taskId: string;
     projectId: string;
-    terminalRef?: React.RefObject<TerminalRef | null>;
-    onTerminalData?: (data: string) => void;
-    onTerminalResize?: (cols: number, rows: number) => void;
     /** Control the active tab from parent (optional) */
-    activeTab?: 'conversation' | 'terminal' | 'design' | 'summary';
+    activeTab?: 'conversation' | 'design' | 'summary';
     /** Callback when tab changes */
-    onTabChange?: (tab: 'conversation' | 'terminal' | 'design' | 'summary') => void;
+    onTabChange?: (tab: 'conversation' | 'design' | 'summary') => void;
 
     /** Structured output to display in Summary tab */
     structuredOutput?: StructuredOutput | StructuredOutput[] | null;
@@ -37,9 +32,6 @@ interface ConversationPanelProps {
 const ConversationPanel = memo(function ConversationPanel({
     taskId,
     projectId,
-    terminalRef,
-    onTerminalData,
-    onTerminalResize,
     activeTab: controlledActiveTab,
     onTabChange,
 
@@ -51,12 +43,12 @@ const ConversationPanel = memo(function ConversationPanel({
     setEditedDesignContent,
     structuredOutput,
 }: ConversationPanelProps) {
-    const [internalActiveTab, setInternalActiveTab] = useState<'conversation' | 'terminal' | 'design' | 'summary'>('conversation');
+    const [internalActiveTab, setInternalActiveTab] = useState<'conversation' | 'design' | 'summary'>('conversation');
 
     // Use controlled tab if provided, otherwise use internal state
     const activeTab = controlledActiveTab ?? internalActiveTab;
 
-    const handleTabChange = (tab: 'conversation' | 'terminal' | 'design' | 'summary') => {
+    const handleTabChange = (tab: 'conversation' | 'design' | 'summary') => {
         if (controlledActiveTab === undefined) {
             setInternalActiveTab(tab);
         }
@@ -94,13 +86,6 @@ const ConversationPanel = memo(function ConversationPanel({
                     <MessageSquare size={16} />
                     对话
                 </button>
-                <button
-                    onClick={() => handleTabChange('terminal')}
-                    className={`chat-tab-btn ${activeTab === 'terminal' ? 'active' : ''}`}
-                >
-                    <Terminal size={16} />
-                    原始输出
-                </button>
                 {/* Only show design tab if content exists or we are passed handlers to edit it */}
                 {(designContent || setIsEditingDesign) && (
                     <button
@@ -135,21 +120,6 @@ const ConversationPanel = memo(function ConversationPanel({
                         isStreaming={isStreaming}
                     />
                 </>
-            ) : activeTab === 'terminal' ? (
-                <div className="unified-panel" style={{ border: 'none' }}>
-                    <div className="panel-content" style={{ padding: '4px' }}>
-                        <TerminalComponent
-                            ref={terminalRef}
-                            onData={onTerminalData}
-                            onResize={onTerminalResize}
-                        />
-                    </div>
-                    <div className="panel-footer" style={{ minHeight: '40px', padding: '0.5rem 1rem' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            Terminal connection: Active
-                        </span>
-                    </div>
-                </div>
             ) : activeTab === 'design' ? (
                 <div className="design-panel">
                     {/* Design Tab Content Area (Scrollable) */}
