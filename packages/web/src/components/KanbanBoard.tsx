@@ -3,10 +3,11 @@ import type { Task, Lane } from '@clawwarden/shared';
 interface TaskCardProps {
     task: Task;
     selected?: boolean;
+    laneColor?: string;
     onClick?: () => void;
 }
 
-export function TaskCard({ task, selected, onClick }: TaskCardProps) {
+export function TaskCard({ task, selected, laneColor, onClick }: TaskCardProps) {
     // Status translation
     const statusLabels: Record<string, string> = {
         'idle': '待执行',
@@ -21,8 +22,15 @@ export function TaskCard({ task, selected, onClick }: TaskCardProps) {
 
     return (
         <div
-            className={`task-card ${selected ? 'selected' : ''}`}
+            className={`task-card ${selected ? 'selected' : ''} ${task.status}`}
             onClick={onClick}
+            style={{
+                '--lane-color': laneColor,
+                ...(selected && laneColor ? {
+                    borderColor: laneColor,
+                    boxShadow: `0 0 0 1px ${laneColor}, var(--card-shadow-hover)`
+                } : {})
+            } as React.CSSProperties}
         >
             <div className="task-title">{task.title}</div>
             {task.description && (
@@ -31,7 +39,7 @@ export function TaskCard({ task, selected, onClick }: TaskCardProps) {
             <div className="task-meta">
                 <span className={`task-status ${task.status}`}>{statusLabel}</span>
                 <span className={`task-creator ${task.createdBy}`}>
-                    {task.createdBy === 'claude' ? '🤖 Claude' : '👤 用户'}
+                    {task.createdBy === 'claude' ? '🤖 Claude' : '👤 You'}
                 </span>
             </div>
         </div>
@@ -61,6 +69,15 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import {
+    Paintbrush,
+    Code2,
+    SearchCode,
+    GitMerge,
+    Archive,
+    Trash2,
+    Plus
+} from 'lucide-react';
 
 interface SortableTaskCardProps extends TaskCardProps {
     id: string;
@@ -116,12 +133,27 @@ export function KanbanLane({ lane, tasks, selectedTaskId, onTaskClick, onAddTask
         }
     });
 
+    const laneIcons: Record<string, React.ReactNode> = {
+        'design': <Paintbrush size={16} />,
+        'develop': <Code2 size={16} />,
+        'test': <SearchCode size={16} />,
+        'pending-merge': <GitMerge size={16} />,
+        'archived': <Archive size={16} />,
+        'deprecated': <Trash2 size={16} />,
+    };
+
     return (
         <div className="kanban-lane" ref={setNodeRef}>
-            <div className="lane-header">
-                <div className="lane-indicator" style={{ backgroundColor: lane.color }} />
-                <span className="lane-title">{lane.name}</span>
-                <span className="lane-count">{tasks.length}</span>
+            <div className="lane-header" style={{ borderBottom: `2px solid ${lane.color}` }}>
+                <span className="lane-title">
+                    <span className="lane-icon" style={{ color: lane.color, marginRight: '8px', display: 'flex', alignItems: 'center' }}>
+                        {laneIcons[lane.id] || <div style={{ width: 16 }} />}
+                    </span>
+                    {lane.name}
+                </span>
+                <button className="lane-add-small" onClick={onAddTask} title="Quick Add">
+                    <Plus size={18} />
+                </button>
             </div>
             <div className="lane-content">
                 <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
@@ -130,16 +162,12 @@ export function KanbanLane({ lane, tasks, selectedTaskId, onTaskClick, onAddTask
                             key={task.id}
                             id={task.id}
                             task={task}
+                            laneColor={lane.color}
                             selected={task.id === selectedTaskId}
                             onClick={() => onTaskClick?.(task)}
                         />
                     ))}
                 </SortableContext>
-                {lane.id === 'design' && (
-                    <button className="add-task-btn" onClick={onAddTask}>
-                        + 添加任务
-                    </button>
-                )}
             </div>
         </div>
     );
@@ -268,7 +296,11 @@ export function KanbanBoard({ lanes, tasks, selectedTaskId, onTaskClick, onAddTa
             {createPortal(
                 <DragOverlay dropAnimation={dropAnimation}>
                     {activeTask ? (
-                        <div className="task-card selected" style={{ cursor: 'grabbing' }}>
+                        <div className="task-card selected" style={{
+                            cursor: 'grabbing',
+                            borderColor: lanes.find(l => l.id === activeTask.laneId)?.color || 'var(--accent)',
+                            boxShadow: `0 0 0 1px ${lanes.find(l => l.id === activeTask.laneId)?.color || 'var(--accent)'}, var(--card-shadow-hover)`
+                        }}>
                             <div className="task-title">{activeTask.title}</div>
                             {activeTask.description && (
                                 <div className="task-description">{activeTask.description}</div>

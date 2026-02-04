@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Logo } from './Logo';
 
 interface HeaderProps {
     projectName?: string;
@@ -19,17 +20,14 @@ export function Header({ projectName, onBackToProjects, onSettingsClick }: Heade
                         ←
                     </button>
                 )}
-                <h1>ClawWarden</h1>
+                <div className="header-brand">
+                    <Logo size={32} />
+                    <h1>ClawWarden</h1>
+                </div>
             </div>
             <div className="header-actions">
                 {projectName && (
-                    <span style={{
-                        color: 'var(--text-secondary)',
-                        fontSize: '0.875rem',
-                        padding: '0.5rem 1rem',
-                        background: 'var(--bg-tertiary)',
-                        borderRadius: '6px',
-                    }}>
+                    <span className="project-badge">
                         📁 {projectName}
                     </span>
                 )}
@@ -89,7 +87,9 @@ export function Layout({
         <div className="app-layout">
             <Header projectName={projectName} onBackToProjects={onBackToProjects} onSettingsClick={onSettingsClick} />
             <div className="app-content">
-                <main className="main-content">{children}</main>
+                <main className="main-content">
+                    {children}
+                </main>
                 {sidebarOpen && sidebarContent && (
                     <Sidebar title={sidebarTitle} onClose={onSidebarClose} wide={sidebarWide}>
                         {sidebarContent}

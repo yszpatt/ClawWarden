@@ -498,15 +498,13 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         <div className="task-detail" style={{
             display: 'flex',
             height: '100%',
-            gap: '1.5rem',
-            overflow: 'hidden' // Container shouldn't scroll, inner columns should
+            gap: 'var(--bento-gap)',
+            overflow: 'hidden'
         }}>
-            {/* Left Column: Conversation Panel (includes Terminal tab) */}
+            {/* Left Column: Conversation Panel */}
             {showTerminal && (
-                <div style={{
+                <div className="bento-module" style={{
                     flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
                     minWidth: 0,
                     height: '100%'
                 }}>
@@ -523,15 +521,13 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
             )}
 
             {/* Right Column: Task Info & Actions */}
-            <div style={{
-                width: showTerminal ? '400px' : '100%',
+            <div className="bento-module" style={{
+                width: showTerminal ? '450px' : '100%',
                 flexShrink: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                overflowY: 'auto',
-                paddingRight: '0.5rem' // Space for scrollbar
+                padding: '1.5rem',
+                overflowY: 'auto'
             }}>
-                <div className="task-detail-header" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginBottom: '1rem' }}>
+                <div className="task-detail-header" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1.5rem' }}>
                     {!isEditing ? (
                         <>
                             <button className="secondary-btn" onClick={() => setIsEditing(true)}>编辑</button>
@@ -546,6 +542,11 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                 </div>
 
                 <div className="form-group">
+                    <label className="form-label" style={{ color: 'var(--accent)', fontWeight: 'bold', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Task ID</label>
+                    <div style={{ fontSize: '0.9rem', fontFamily: 'monospace', color: 'var(--text-primary)', marginBottom: '1rem' }}>{task.id}</div>
+                </div>
+
+                <div className="form-group">
                     <label className="form-label">标题</label>
                     {isEditing ? (
                         <input
@@ -555,12 +556,7 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                             onChange={e => setEditForm({ ...editForm, title: e.target.value })}
                         />
                     ) : (
-                        <input
-                            type="text"
-                            className="form-input"
-                            value={task.title}
-                            readOnly
-                        />
+                        <div style={{ fontSize: '1.25rem', fontWeight: 'bold', color: 'var(--text-primary)', marginBottom: '1rem' }}>{task.title}</div>
                     )}
                 </div>
 
@@ -573,96 +569,89 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                             onChange={e => setEditForm({ ...editForm, description: e.target.value })}
                         />
                     ) : (
-                        <textarea
-                            className="form-textarea"
-                            value={task.description}
-                            readOnly
-                        />
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: '1.6', marginBottom: '1.5rem' }}>{task.description}</div>
                     )}
                 </div>
 
                 {(task.prompt || isEditing) && (
                     <div className="form-group">
-                        <label className="form-label">Prompt</label>
+                        <label className="form-label">Execution Prompt</label>
                         {isEditing ? (
                             <textarea
                                 className="form-textarea"
                                 value={editForm.prompt}
                                 onChange={e => setEditForm({ ...editForm, prompt: e.target.value })}
-                                style={{ minHeight: '100px', fontFamily: 'monospace', fontSize: '0.75rem' }}
+                                style={{ minHeight: '120px', fontFamily: 'monospace', fontSize: '0.8rem' }}
                                 placeholder="Claude execution prompt..."
                             />
                         ) : (
-                            <textarea
-                                className="form-textarea"
-                                value={task.prompt}
-                                readOnly
-                                style={{ minHeight: '100px', fontFamily: 'monospace', fontSize: '0.75rem' }}
-                            />
+                            <div style={{
+                                background: 'rgba(0,0,0,0.3)',
+                                padding: '1rem',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                fontFamily: 'monospace',
+                                fontSize: '0.8rem',
+                                color: 'var(--neon-cyan)',
+                                whiteSpace: 'pre-wrap',
+                                marginBottom: '1.5rem'
+                            }}>{task.prompt}</div>
                         )}
                     </div>
                 )}
 
-                <div className="form-group">
-                    <label className="form-label">状态</label>
-                    <span className={`task-status ${task.status}`}>{
-                        task.status === 'idle' ? '待执行' :
-                            task.status === 'running' ? '执行中' :
-                                task.status === 'completed' ? '已完成' :
-                                    task.status === 'failed' ? '失败' :
-                                        task.status === 'pending-dev' ? '待开发' :
-                                            task.status === 'pending-merge' ? '待合并' :
-                                                task.status
-                    }</span>
-                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">状态</label>
+                        <span className={`task-status ${task.status} status-badge-glow`} style={{ display: 'inline-block' }}>{
+                            task.status === 'idle' ? '待执行' :
+                                task.status === 'running' ? '执行中' :
+                                    task.status === 'completed' ? '已完成' :
+                                        task.status === 'failed' ? '失败' :
+                                            task.status === 'pending-dev' ? '待开发' :
+                                                task.status === 'pending-merge' ? '待合并' :
+                                                    task.status
+                        }</span>
+                    </div>
 
-                <div className="form-group">
-                    <label className="form-label">创建者</label>
-                    <span className={`task-creator ${task.createdBy}`}>
-                        {task.createdBy === 'claude' ? '🤖 Claude' : '👤 用户'}
-                    </span>
+                    <div className="form-group" style={{ margin: 0 }}>
+                        <label className="form-label">创建者</label>
+                        <span className={`task-creator ${task.createdBy}`} style={{ fontWeight: 'bold' }}>
+                            {task.createdBy === 'claude' ? '🤖 CLAUDE' : '👤 USER'}
+                        </span>
+                    </div>
                 </div>
 
                 {task.claudeSession && (
-                    <div className="form-group">
+                    <div className="form-group" style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
                         <label className="form-label">Claude Session</label>
-                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', background: 'var(--bg-tertiary)', color: 'var(--text-primary)', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)' }}>
-                            <div>ID: {task.claudeSession.id}</div>
-                            <div style={{ color: 'var(--text-primary)', opacity: 0.7 }}>Created: {new Date(task.claudeSession.createdAt).toLocaleString()}</div>
-                            <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
-                                <div style={{ color: 'var(--text-primary)', opacity: 0.7, marginBottom: '0.25rem' }}>Resume in terminal:</div>
-                                <div style={{ background: 'var(--bg-secondary)', padding: '0.25rem 0.5rem', borderRadius: '2px', fontSize: '0.7rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <code style={{ color: 'var(--accent-color)' }}>cd {task.worktree ? task.worktree.path : 'project-path'} && claude -r {task.claudeSession.id}</code>
-                                </div>
-                            </div>
+                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>ID: {task.claudeSession.id}</div>
+                            <div style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>{new Date(task.claudeSession.createdAt).toLocaleString()}</div>
                         </div>
                     </div>
                 )}
 
                 {task.worktree && (
-                    <div className="form-group">
-                        <label className="form-label">
-                            Worktree {task.worktree.removedAt && <span style={{ color: 'var(--text-secondary)', fontWeight: 'normal' }}>(已删除)</span>}
-                        </label>
-                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', background: task.worktree.removedAt ? 'var(--bg-secondary)' : 'var(--bg-tertiary)', color: 'var(--text-primary)', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', opacity: task.worktree.removedAt ? 0.7 : 1 }}>
-                            <div>Path: {task.worktree.path}</div>
-                            <div>Branch: {task.worktree.branch}</div>
-                            <div style={{ opacity: 0.8 }}>Created: {new Date(task.worktree.createdAt).toLocaleString()}</div>
-                            {task.worktree.removedAt && <div style={{ color: '#EF4444', opacity: 0.9 }}>Removed: {new Date(task.worktree.removedAt).toLocaleString()}</div>}
+                    <div className="form-group" style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+                        <label className="form-label">Worktree {task.worktree.removedAt && <span style={{ color: 'var(--neon-rose)' }}>(已删除)</span>}</label>
+                        <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-primary)' }}>
+                            <div style={{ color: 'var(--neon-amber)' }}>Branch: {task.worktree.branch}</div>
+                            <div style={{ color: 'var(--text-muted)', marginTop: '0.25rem' }}>{new Date(task.worktree.createdAt).toLocaleString()}</div>
                         </div>
                     </div>
                 )}
 
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem', marginBottom: '1.5rem' }}>
                     {renderActionButtons()}
                 </div>
 
-                {/* 设计方案预览 (设计泳道使用 Markdown 文件) */}
                 {renderDesignPreview()}
 
-                {/* 结构化输出 (仅非设计泳道显示，如开发/测试) */}
                 {structuredOutput && task.laneId !== 'design' && (
-                    <StructuredOutputViewer output={structuredOutput} />
+                    <div className="structured-viewer-container" style={{ marginTop: '1.5rem' }}>
+                        <StructuredOutputViewer output={structuredOutput} />
+                    </div>
                 )}
             </div>
         </div>
