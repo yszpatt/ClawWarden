@@ -77,7 +77,7 @@ ClawWarden/
 │   ├── agent/    # Fastify 后端
 │   └── shared/   # 共享类型
 ├── skills/       # 自定义 Claude Code Skill
-└── docs/         # 设计与实现文档
+└── docs/         # 计划与实现文档
 ```
 
 ---

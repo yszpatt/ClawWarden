@@ -77,7 +77,7 @@ ClawWarden/
 │   ├── agent/    # Fastify backend
 │   └── shared/   # Shared types
 ├── skills/       # Custom Claude Code skills
-└── docs/         # Design and implementation plans
+└── docs/         # Plan and implementation docs
 ```
 
 ---
