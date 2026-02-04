@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Task, StructuredOutput } from '@clawwarden/shared';
 import { useTerminalConnection, type TerminalRef } from './Terminal';
 import { ConversationPanel } from './conversation/ConversationPanel';
@@ -70,6 +70,15 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
             setStructuredOutput(output as StructuredOutput);
         }
     });
+
+    // Memoize handlers for ConversationPanel to prevent re-renders
+    const handleTerminalData = useCallback((data: string) => {
+        sendInput(data);
+    }, [sendInput]);
+
+    const handleTerminalResize = useCallback((cols: number, rows: number) => {
+        handleResize(cols, rows);
+    }, [handleResize]);
 
     // Sync terminalRef with setTerminalRef
     useEffect(() => {
@@ -418,7 +427,6 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     // 渲染设计方案预览
     const renderDesignPreview = () => {
         const taskToUse = fetchedTask || task;
-        console.log('[renderDesignPreview] task.designPath:', task.designPath, 'fetchedTask.designPath:', fetchedTask?.designPath, 'designContent:', !!designContent);
         if (!taskToUse.designPath && !designContent) return null;
 
         return (
@@ -495,25 +503,16 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     const showTerminal = true;
 
     return (
-        <div className="task-detail" style={{
-            display: 'flex',
-            height: '100%',
-            gap: 'var(--bento-gap)',
-            overflow: 'hidden'
-        }}>
+        <div className="task-detail-container">
             {/* Left Column: Conversation Panel */}
             {showTerminal && (
-                <div className="bento-module" style={{
-                    flex: 1,
-                    minWidth: 0,
-                    height: '100%'
-                }}>
+                <div className="task-detail-sidebar">
                     <ConversationPanel
                         taskId={task.id}
                         projectId={projectId}
                         terminalRef={terminalRef}
-                        onTerminalData={(data) => sendInput(data)}
-                        onTerminalResize={(cols, rows) => handleResize(cols, rows)}
+                        onTerminalData={handleTerminalData}
+                        onTerminalResize={handleTerminalResize}
                         activeTab={activeTab}
                         onTabChange={setActiveTab}
                     />
@@ -521,12 +520,7 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
             )}
 
             {/* Right Column: Task Info & Actions */}
-            <div className="bento-module" style={{
-                width: showTerminal ? '450px' : '100%',
-                flexShrink: 0,
-                padding: '1.5rem',
-                overflowY: 'auto'
-            }}>
+            <div className="task-detail-main" style={{ width: showTerminal ? '450px' : '100%' }}>
                 <div className="task-detail-header" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginBottom: '1.5rem' }}>
                     {!isEditing ? (
                         <>

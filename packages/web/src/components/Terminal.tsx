@@ -1,4 +1,4 @@
-import { useEffect, useRef, forwardRef, useImperativeHandle, useState } from 'react';
+import { useEffect, useRef, forwardRef, useImperativeHandle, useState, useCallback } from 'react';
 import { Terminal as XTerm } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { useTheme } from '../context/ThemeContext';
@@ -408,23 +408,23 @@ export function useTerminalConnection(
 
 
 
-    const connect = (onReady?: () => void): (() => void) => {
+    const connect = useCallback((onReady?: () => void): (() => void) => {
         manager.connect();
         if (onReady) {
             return manager.onReady(onReady);  // Return cancel function
         }
         return () => { };  // No-op cancel if no callback
-    };
+    }, [manager]);
 
-    const execute = () => {
+    const execute = useCallback(() => {
         manager.send({
             type: 'execute',
             projectId,
             taskId,
         });
-    };
+    }, [manager, projectId, taskId]);
 
-    const sendInput = (data: string) => {
+    const sendInput = useCallback((data: string) => {
         const sessionId = sessionIdRef.current || manager.getSessionId(taskId);
         if (sessionId) {
             manager.send({
@@ -433,9 +433,9 @@ export function useTerminalConnection(
                 data,
             });
         }
-    };
+    }, [manager, taskId]);
 
-    const handleResize = (cols: number, rows: number) => {
+    const handleResize = useCallback((cols: number, rows: number) => {
         const sessionId = sessionIdRef.current || manager.getSessionId(taskId);
         if (sessionId) {
             manager.send({
@@ -445,22 +445,22 @@ export function useTerminalConnection(
                 rows,
             });
         }
-    };
+    }, [manager, taskId]);
 
-    const stop = () => {
+    const stop = useCallback(() => {
         manager.send({
             type: 'stop',
             taskId,
         });
-    };
+    }, [manager, taskId]);
 
-    const disconnect = () => {
+    const disconnect = useCallback(() => {
         // No-op: we don't disconnect the global manager when component unmounts
         // This is the key change that prevents connection thrashing
         sessionIdRef.current = null;
-    };
+    }, []);
 
-    const attach = () => {
+    const attach = useCallback(() => {
         console.log('[Terminal] attach() called for taskId:', taskId);
         // Use global tracking in ConnectionManager to prevent duplicate attach calls
         const hasPending = manager.hasPendingAttach(taskId);
@@ -476,7 +476,11 @@ export function useTerminalConnection(
             projectId,
             taskId,
         });
-    };
+    }, [manager, projectId, taskId]);
+
+    const setTerminalRef = useCallback((ref: TerminalRef | null) => {
+        terminalRef.current = ref;
+    }, []);
 
     return {
         connect,
@@ -486,8 +490,6 @@ export function useTerminalConnection(
         handleResize,
         stop,
         disconnect,
-        setTerminalRef: (ref: TerminalRef | null) => {
-            terminalRef.current = ref;
-        },
+        setTerminalRef,
     };
 }

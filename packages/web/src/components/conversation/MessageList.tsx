@@ -69,19 +69,9 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
     };
 
     return (
-        <div className="message-list" style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '1rem',
-            display: 'flex',
-            flexDirection: 'column',
-        }}>
+        <div className="message-list-container">
             {messages.length === 0 ? (
-                <div style={{
-                    textAlign: 'center',
-                    color: 'var(--text-secondary)',
-                    marginTop: '2rem',
-                }}>
+                <div className="chat-empty-state">
                     <p>👋 开始对话</p>
                     <p style={{ fontSize: '0.875rem' }}>输入消息与 Claude 进行交互</p>
                 </div>
@@ -92,26 +82,12 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
                         const isExpanded = expandedIds.has(uniqueId);
 
                         return (
-                            <div key={uniqueId} style={{ marginBottom: '0.5rem' }}>
-                                <div
-                                    onClick={() => toggleGroup(uniqueId)}
-                                    style={{
-                                        background: 'var(--bg-secondary)',
-                                        border: '1px solid var(--border-color)',
-                                        borderRadius: '8px',
-                                        overflow: 'hidden',
-                                    }}
-                                >
-                                    <div style={{
-                                        padding: '0.5rem 1rem',
-                                        cursor: 'pointer',
-                                        userSelect: 'none',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.5rem',
-                                        fontSize: '0.875rem',
-                                        color: 'var(--text-secondary)',
-                                    }}>
+                            <div key={uniqueId} className="tool-group-container">
+                                <div className="tool-group-header">
+                                    <div
+                                        className="tool-group-title"
+                                        onClick={() => toggleGroup(uniqueId)}
+                                    >
                                         <span style={{ fontSize: '0.75rem' }}>
                                             {isExpanded ? '▼' : '▶'}
                                         </span>
@@ -119,69 +95,39 @@ export function MessageList({ messages, isStreaming }: MessageListProps) {
                                         <span>工具调用 ({item.tools.length})</span>
                                     </div>
                                     {isExpanded && (
-                                        <div style={{
-                                            padding: '0.5rem 1rem',
-                                            borderTop: '1px solid var(--border-color)',
-                                            display: 'flex',
-                                            flexDirection: 'column',
-                                            gap: '0.5rem',
-                                        }}>
+                                        <div className="tool-group-content">
                                             {item.tools.map((toolMsg, i) => {
                                                 const tool = toolMsg.toolCall;
                                                 if (!tool) return null;
                                                 return (
-                                                    <div key={`${toolMsg.id}-${i}`} style={{
-                                                        background: 'var(--bg-card)',
-                                                        border: '1px solid var(--border-color)',
-                                                        borderRadius: '4px',
-                                                        padding: '0.5rem',
-                                                    }}>
-                                                        <div style={{
-                                                            display: 'flex',
-                                                            justifyContent: 'space-between',
-                                                            alignItems: 'center',
-                                                        }}>
-                                                            <div style={{
-                                                                fontWeight: 500,
-                                                                color: 'var(--accent)',
-                                                            }}>
+                                                    <div key={`${toolMsg.id}-${i}`} className="tool-item">
+                                                        <div className="tool-item-header">
+                                                            <div className="tool-name">
                                                                 {tool.name}
                                                             </div>
                                                             {tool.status === 'pending' && (
-                                                                <span style={{ fontSize: '0.75rem', color: 'orange' }}>
+                                                                <span className="tool-status-pending">
                                                                     ⏳ 执行中...
                                                                 </span>
                                                             )}
                                                             {tool.status === 'success' && (
-                                                                <span style={{ fontSize: '0.75rem', color: 'green' }}>
+                                                                <span className="tool-status-success">
                                                                     ✓ 完成
                                                                 </span>
                                                             )}
                                                             {tool.status === 'error' && (
-                                                                <span style={{ fontSize: '0.75rem', color: 'red' }}>
+                                                                <span className="tool-status-error">
                                                                     ✗ 失败
                                                                 </span>
                                                             )}
                                                         </div>
                                                         {(tool.input as any) && (
-                                                            <pre style={{
-                                                                fontSize: '0.75rem',
-                                                                overflow: 'auto',
-                                                                maxHeight: '100px',
-                                                                marginTop: '0.25rem',
-                                                            }}>
+                                                            <pre className="tool-io-block">
                                                                 {typeof tool.input === 'string' ? tool.input : JSON.stringify(tool.input, null, 2) as string}
                                                             </pre>
                                                         )}
                                                         {(tool.output as any) && (
-                                                            <pre style={{
-                                                                fontSize: '0.75rem',
-                                                                overflow: 'auto',
-                                                                maxHeight: '150px',
-                                                                marginTop: '0.25rem',
-                                                                whiteSpace: 'pre-wrap',
-                                                                wordBreak: 'break-word',
-                                                            }}>
+                                                            <pre className="tool-io-block">
                                                                 {tool.output}
                                                             </pre>
                                                         )}

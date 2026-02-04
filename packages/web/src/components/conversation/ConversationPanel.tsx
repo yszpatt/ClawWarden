@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { MessageSquare, Terminal } from 'lucide-react';
 import { useConversation } from '../../hooks/useConversation';
 import { connectionManager } from '../../services/ConnectionManager';
@@ -20,7 +20,7 @@ interface ConversationPanelProps {
     onTabChange?: (tab: 'conversation' | 'terminal') => void;
 }
 
-export function ConversationPanel({
+const ConversationPanel = memo(function ConversationPanel({
     taskId,
     projectId,
     terminalRef,
@@ -56,59 +56,19 @@ export function ConversationPanel({
     };
 
     return (
-        <div className="conversation-panel" style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: '100%',
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            overflow: 'hidden',
-        }}>
+        <div className="conversation-panel">
             {/* Tab bar */}
-            <div style={{
-                display: 'flex',
-                borderBottom: '1px solid var(--border-color)',
-                background: 'var(--bg-secondary)',
-            }}>
+            <div className="chat-tab-bar">
                 <button
                     onClick={() => handleTabChange('conversation')}
-                    className={`tab-button ${activeTab === 'conversation' ? 'active' : ''}`}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.75rem 1.5rem',
-                        fontSize: '0.875rem',
-                        fontWeight: activeTab === 'conversation' ? '600' : '400',
-                        border: 'none',
-                        color: activeTab === 'conversation' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        background: activeTab === 'conversation' ? 'var(--bg-card)' : 'transparent',
-                        borderBottom: activeTab === 'conversation' ? '2px solid var(--accent)' : '2px solid transparent',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                    }}
+                    className={`chat-tab-btn ${activeTab === 'conversation' ? 'active' : ''}`}
                 >
                     <MessageSquare size={16} />
                     对话
                 </button>
                 <button
                     onClick={() => handleTabChange('terminal')}
-                    className={`tab-button ${activeTab === 'terminal' ? 'active' : ''}`}
-                    style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        padding: '0.75rem 1.5rem',
-                        fontSize: '0.875rem',
-                        fontWeight: activeTab === 'terminal' ? '600' : '400',
-                        border: 'none',
-                        color: activeTab === 'terminal' ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        background: activeTab === 'terminal' ? 'var(--bg-card)' : 'transparent',
-                        borderBottom: activeTab === 'terminal' ? '2px solid var(--accent)' : '2px solid transparent',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                    }}
+                    className={`chat-tab-btn ${activeTab === 'terminal' ? 'active' : ''}`}
                 >
                     <Terminal size={16} />
                     原始输出
@@ -128,11 +88,7 @@ export function ConversationPanel({
                     />
                 </>
             ) : (
-                <div style={{
-                    flex: 1,
-                    padding: '0.5rem',
-                    overflow: 'hidden',
-                }}>
+                <div style={{ flex: 1, padding: '0.5rem', overflow: 'hidden' }}>
                     <TerminalComponent
                         ref={terminalRef}
                         onData={onTerminalData}
@@ -142,4 +98,6 @@ export function ConversationPanel({
             )}
         </div>
     );
-}
+});
+
+export { ConversationPanel };

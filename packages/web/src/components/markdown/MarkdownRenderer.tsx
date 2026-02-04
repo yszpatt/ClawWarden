@@ -9,6 +9,11 @@ interface MarkdownRendererProps {
 }
 
 export function MarkdownRenderer({ content, className }: MarkdownRendererProps) {
+    // Pre-process content to force soft breaks (standard markdown requires 2 spaces)
+    // We add 2 spaces before every newline to ensure single newlines render as line breaks
+    // This is common behavior for chat interfaces
+    const processedContent = content.replace(/\n/g, '  \n');
+
     return (
         <div className={className}>
             <ReactMarkdown
@@ -71,7 +76,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
                     },
                 }}
             >
-                {content}
+                {processedContent}
             </ReactMarkdown>
         </div>
     );

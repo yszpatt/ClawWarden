@@ -10,18 +10,8 @@ interface MessageBubbleProps {
 export function MessageBubble({ message }: MessageBubbleProps) {
     if (message.role === 'user') {
         return (
-            <div className="message-bubble user" style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                marginBottom: '0.5rem',
-            }}>
-                <div style={{
-                    maxWidth: '80%',
-                    background: 'var(--accent)',
-                    color: 'white',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '12px 12px 0 12px',
-                }}>
+            <div className="message-row user">
+                <div className="chat-bubble user">
                     <div style={{ fontSize: '0.9rem', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
                         {message.content}
                     </div>
@@ -48,21 +38,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         const Icon = icons[message.type || 'info'];
 
         return (
-            <div className="message-bubble system" style={{
-                display: 'flex',
-                justifyContent: 'center',
-                marginBottom: '0.5rem',
-            }}>
-                <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    fontSize: '0.875rem',
-                    color: 'var(--text-secondary)',
-                    padding: '0.5rem 1rem',
-                    background: 'var(--bg-secondary)',
-                    borderRadius: '8px',
-                }}>
+            <div className="message-row system">
+                <div className="chat-bubble system">
                     <Icon size={16} />
                     {message.content}
                 </div>
@@ -76,12 +53,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     // Text content
     if (msg.content) {
         return (
-            <div className="message-bubble assistant-text" style={{
-                display: 'flex',
-                justifyContent: 'flex-start',
-                marginBottom: '0.5rem',
-            }}>
-                <div style={{ fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-primary)' }}>
+            <div className="message-row assistant">
+                <div className="chat-bubble assistant">
                     <MarkdownRenderer content={msg.content} />
                 </div>
             </div>
@@ -107,34 +80,13 @@ function ThinkingBlock({ content }: { content: string }) {
         <div style={{ marginBottom: '0.5rem' }}>
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    background: 'transparent',
-                    border: 'none',
-                    borderRadius: '6px',
-                    padding: '0.5rem 0.75rem',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    color: 'var(--text-secondary)',
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
-                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+                className="thinking-btn"
             >
                 {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                 <span>💭 思考过程</span>
             </button>
             {isExpanded && (
-                <div style={{
-                    marginTop: '0.5rem',
-                    padding: '0.75rem',
-                    background: 'var(--bg-card)',
-                    border: '1px solid var(--border-color)',
-                    borderRadius: '6px',
-                    fontSize: '0.875rem',
-                    color: 'var(--text-secondary)',
-                }}>
+                <div className="thinking-content">
                     <MarkdownRenderer content={content} />
                 </div>
             )}
