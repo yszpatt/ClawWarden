@@ -60,6 +60,8 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
 ## 质量准则
 - 确保计划具备可落地性
 - 考虑代码质量和长期可维护性`,
+        develop: '进行项目的开发',
+        test: '进行项目的测试',
     },
 };
 
