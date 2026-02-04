@@ -54,6 +54,12 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
             setIsGeneratingPlan(false);
         },
         onStatusChange: (status) => {
+            if (status !== 'running') {
+                setIsGeneratingPlan(false);
+                setIsRunningState(false);
+            } else {
+                setIsRunningState(true);
+            }
             onStatusChange?.(status as Task['status']);
         },
         onStructuredOutput: (output) => {
@@ -123,6 +129,7 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     const handleStop = () => {
         stop();
         setIsRunningState(false);
+        setIsGeneratingPlan(false);
         onStatusChange?.('idle');
     };
 
@@ -176,6 +183,14 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         const themeColor = getLaneColor(laneId);
 
         if (laneId === 'plan') {
+            if (isGeneratingPlan) {
+                return (
+                    <button className="btn-unified danger" onClick={handleStop} style={{ width: '100%', padding: '0.75rem' }}>
+                        <Square size={16} fill="currentColor" />
+                        停止生成
+                    </button>
+                );
+            }
             return (
                 <button
                     className="btn-unified primary"
@@ -184,7 +199,7 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                     style={{ width: '100%', padding: '0.75rem', background: themeColor, borderColor: themeColor }}
                 >
                     <Palette size={16} />
-                    {isGeneratingPlan ? '正在生成计划方案...' : '生成计划方案'}
+                    生成计划方案
                 </button>
             );
         }

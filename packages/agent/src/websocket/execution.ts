@@ -719,6 +719,11 @@ async function handleConversationPlanStart(
     await writeProjectData(project.path, data);
     console.log(`[Execution] Plan task ${taskId} status set to running`);
 
+    // Register this execution for stop functionality
+    const executionContext = { stopped: false, connection };
+    runningLaneExecutions.set(taskId, executionContext);
+    console.log(`[Execution] Registered plan execution for task: ${taskId}`);
+
     // Send status update notification to frontend
     if (connection.socket.readyState === 1) {
         connection.socket.send(JSON.stringify({
@@ -780,6 +785,7 @@ async function handleConversationPlanStart(
     // Track current text content for streaming
     let currentContentMsgId: string | null = null;
     let currentTextContent = '';
+    const pendingToolCalls = new Map<string, { name: string; input: unknown; msgId: string }>();
 
     // Use query() for streaming design
     try {
@@ -792,6 +798,12 @@ async function handleConversationPlanStart(
                 resume: sessionId,
             },
         })) {
+            // Check if execution was stopped
+            if (executionContext.stopped) {
+                console.log(`[Execution] Plan execution was stopped, breaking loop`);
+                break;
+            }
+
             console.log('[Execution] Plan message type:', sdkMessage.type);
 
             // Track session ID
@@ -832,6 +844,54 @@ async function handleConversationPlanStart(
                 } else if (event?.type === 'content_block_stop') {
                     currentContentMsgId = null;
                     currentTextContent = '';
+
+                    // Check if this is the end of a tool_use block
+                    if (event?.block?.type === 'tool_use') {
+                        const toolUseId = event.block.id;
+                        const pendingTool = pendingToolCalls.get(toolUseId);
+                        if (pendingTool) {
+                            // Send tool_call_output message
+                            const toolMsg: ConversationMessage = {
+                                id: pendingTool.msgId,
+                                role: 'assistant',
+                                toolCall: {
+                                    name: pendingTool.name,
+                                    input: pendingTool.input,
+                                    output: 'Tool executed by SDK',
+                                    status: 'success',
+                                },
+                                groupId,
+                                timestamp: new Date().toISOString(),
+                            };
+                            await sendAndSaveMessage(connection, taskId, projectPath, toolMsg);
+                            pendingToolCalls.delete(toolUseId);
+                        }
+                    }
+                } else if (event?.type === 'content_block_start' && event.block?.type === 'tool_use') {
+                    const toolName = event.block.name;
+                    const toolInput = event.block.input;
+                    const toolUseId = event.block.id;
+                    const toolMsgId = uuid();
+
+                    pendingToolCalls.set(toolUseId, {
+                        name: toolName,
+                        input: toolInput,
+                        msgId: toolMsgId,
+                    });
+
+                    // Send tool_call_start message
+                    const toolMsg: ConversationMessage = {
+                        id: toolMsgId,
+                        role: 'assistant',
+                        toolCall: {
+                            name: toolName,
+                            input: toolInput,
+                            status: 'pending',
+                        },
+                        groupId,
+                        timestamp: new Date().toISOString(),
+                    };
+                    await sendAndSaveMessage(connection, taskId, projectPath, toolMsg);
                 }
             }
 
@@ -852,6 +912,31 @@ async function handleConversationPlanStart(
                             };
                             await sendAndSaveMessage(connection, taskId, projectPath, contentMsg);
                             currentTextContent += block.text;
+                        } else if (block.type === 'tool_use') {
+                            const toolName = block.name;
+                            const toolInput = block.input;
+                            const toolUseId = block.id;
+                            const toolMsgId = uuid();
+
+                            pendingToolCalls.set(toolUseId, {
+                                name: toolName,
+                                input: toolInput,
+                                msgId: toolMsgId,
+                            });
+
+                            // Send tool_call_start message
+                            const toolMsg: ConversationMessage = {
+                                id: toolMsgId,
+                                role: 'assistant',
+                                toolCall: {
+                                    name: toolName,
+                                    input: toolInput,
+                                    status: 'pending',
+                                },
+                                groupId,
+                                timestamp: new Date().toISOString(),
+                            };
+                            await sendAndSaveMessage(connection, taskId, projectPath, toolMsg);
                         }
                     }
                 }
@@ -1006,6 +1091,9 @@ async function handleConversationPlanStart(
             taskId,
             error: error.message,
         } as ConversationWsMessage));
+    } finally {
+        runningLaneExecutions.delete(taskId);
+        console.log(`[Execution] Cleared plan execution tracking for task: ${taskId}`);
     }
 }
 
