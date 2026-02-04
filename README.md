@@ -3,18 +3,18 @@
 [![English](https://img.shields.io/badge/lang-English-blue.svg)](#)
 [![简体中文](https://img.shields.io/badge/lang-简体中文-red.svg)](README.zh-CN.md)
 
-ClawWarden is a sophisticated Kanban-style task management dashboard designed to orchestrate and monitor **Claude Code CLI** workflows. It provides a visual interface for managing complex development tasks, featuring integrated terminals, worktree management, and bidirectional synchronization with Claude Code.
+ClawWarden is a sophisticated Kanban-style task management dashboard designed to orchestrate and monitor **Claude Code CLI** workflows. It provides a visual interface for managing complex development tasks, featuring automated worktree isolation, incremental task summaries, and a native conversational interaction model.
 
 ---
 
 ## ✨ Key Features
 
 - **📋 Kanban Workflow**: Manage tasks through distinct stages (Design, Develop, Test, etc.).
-- **💻 Integrated Terminal**: Interactive Xterm.js terminal for direct Claude Code CLI communication.
+- **📝 Incremental Summaries**: Hierarchical, accordion-style task progression logs with Markdown support.
+- **🗣️ Conversational Interaction**: Native chat interface for direct instruction and feedback during task execution.
 - **🛠️ Worktree Management**: Automated `git worktree` isolation for concurrent task execution.
-- **🔄 Bidirectional Sync**: Tasks can be created via the UI or automatically by Claude using custom skills.
-- **🎨 Modern UI**: Sleek React-based interface with dark mode and drag-and-drop support.
-- **🚀 Monorepo Architecture**: Scalable structure built with pnpm workspaces.
+- **🔄 Lane-Specific Logic**: Synchronized themes, icons, and specialized actions for each development lane.
+- **🎨 Modern UI**: Sleek React-based interface with dark mode, deep glassmorphism, and drag-and-drop support.
 
 ---
 
@@ -30,8 +30,8 @@ ClawWarden is built as a monorepo containing three main components:
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React 19, TypeScript, Vite, Zustand, @dnd-kit, Xterm.js
-- **Backend**: Node.js, Fastify, WebSocket, node-pty, Claude Agent SDK
+- **Frontend**: React 19, TypeScript, Vite, Zustand, @dnd-kit, React Markdown
+- **Backend**: Node.js, Fastify, WebSocket, Claude Agent SDK
 - **Package Manager**: pnpm
 
 ---

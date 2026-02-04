@@ -3,18 +3,18 @@
 [![English](https://img.shields.io/badge/lang-English-blue.svg)](README.md)
 [![简体中文](https://img.shields.io/badge/lang-简体中文-red.svg)](#)
 
-ClawWarden 是一个为 **Claude Code CLI** 量身定制的任务看板管理系统。它为管理复杂的开发任务提供了一个可视化界面，集成了交互式终端、Git Worktree 管理，并支持与 Claude Code 的双向同步。
+ClawWarden 是一个为 **Claude Code CLI** 量身定制的任务看板管理系统。它为管理复杂的开发任务提供了一个可视化界面，支持自动化的 Git Worktree 隔离、增量式任务摘要，以及原生的对话式交互模型。
 
 ---
 
 ## ✨ 核心特性
 
 - **📋 看板式工作流**: 通过清晰的阶段（设计、开发、测试等）管理任务。
-- **💻 集成终端**: 使用 Xterm.js 实现的交互式终端，直接与 Claude Code CLI 通信。
+- **📝 增量任务摘要**: 层次化的折叠式进度日志，支持 Markdown 渲染。
+- **🗣️ 对话式交互**: 原生的聊天界面，支持在任务执行过程中直接进行指令下达和反馈。
 - **🛠️ Worktree 管理**: 自动化的 `git worktree` 隔离，支持多任务并行开发。
-- **🔄 双向同步**: 既可以通过 UI 创建任务，也可以由 Claude 使用自定义 Skill 自动生成任务。
-- **🎨 现代 UI**: 基于 React 的简洁界面，支持深色模式和拖拽操作。
-- **🚀 Monorepo 架构**: 使用 pnpm workspaces 构建，结构清晰易扩展。
+- **🔄 泳道专属逻辑**: 为每个开发阶段同步了主题色、图标和专属的操作按钮。
+- **🎨 现代 UI**: 基于 React 的简洁界面，支持深色模式、深度毛玻璃效果和拖拽操作。
 
 ---
 
@@ -30,8 +30,8 @@ ClawWarden 采用 Monorepo 结构，包含三个核心组件：
 
 ## 🛠️ 技术栈
 
-- **前端**: React 19, TypeScript, Vite, Zustand, @dnd-kit, Xterm.js
-- **后端**: Node.js, Fastify, WebSocket, node-pty, Claude Agent SDK
+- **前端**: React 19, TypeScript, Vite, Zustand, @dnd-kit, React Markdown
+- **后端**: Node.js, Fastify, WebSocket, Claude Agent SDK
 - **包管理器**: pnpm
 
 ---
