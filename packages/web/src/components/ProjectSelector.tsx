@@ -24,19 +24,13 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
         loadProjects();
     }, []);
 
-    const loadProjects = async (retryCount = 0, maxRetries = 5) => {
+    const loadProjects = async () => {
         try {
             setLoading(true);
             setError(null);
             const data = await fetchProjects();
             setProjects(data);
         } catch (err) {
-            // Retry if the server is not ready yet (connection refused or fetch failed)
-            if (retryCount < maxRetries) {
-                const delay = 500 * Math.pow(1.5, retryCount); // Progressive delay: 500ms, 750ms, 1125ms...
-                await new Promise(resolve => setTimeout(resolve, delay));
-                return loadProjects(retryCount + 1, maxRetries);
-            }
             setError(err instanceof Error ? err.message : '加载项目失败');
         } finally {
             setLoading(false);
@@ -148,70 +142,70 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
                         </div>
                     )}
                 </div>
+            </div>
 
-                {showNewForm && !showFolderPicker && (
-                    <div className="modal-overlay" onClick={() => setShowNewForm(false)}>
-                        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                            <h2>新建/导入项目</h2>
-                            <div className="form-group">
-                                <label className="form-label">项目名称</label>
+            {showNewForm && !showFolderPicker && (
+                <div className="modal-overlay" onClick={() => setShowNewForm(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h2>新建/导入项目</h2>
+                        <div className="form-group">
+                            <label className="form-label">项目名称</label>
+                            <input
+                                type="text"
+                                className="form-input"
+                                placeholder="My Project"
+                                value={newName}
+                                onChange={(e) => setNewName(e.target.value)}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">项目路径</label>
+                            <div className="input-with-action">
                                 <input
                                     type="text"
                                     className="form-input"
-                                    placeholder="My Project"
-                                    value={newName}
-                                    onChange={(e) => setNewName(e.target.value)}
+                                    placeholder="/path/to/project"
+                                    value={newPath}
+                                    onChange={(e) => setNewPath(e.target.value)}
                                 />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">项目路径</label>
-                                <div className="input-with-action">
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="/path/to/project"
-                                        value={newPath}
-                                        onChange={(e) => setNewPath(e.target.value)}
-                                    />
-                                    <button
-                                        className="browse-btn"
-                                        onClick={() => setShowFolderPicker(true)}
-                                    >
-                                        浏览...
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="modal-actions">
-                                <button className="cancel-btn" onClick={() => setShowNewForm(false)}>
-                                    取消
-                                </button>
                                 <button
-                                    className="primary-btn"
-                                    onClick={handleCreate}
-                                    disabled={creating || !newName.trim() || !newPath.trim()}
+                                    className="browse-btn"
+                                    onClick={() => setShowFolderPicker(true)}
                                 >
-                                    {creating ? '正在处理...' : '确认'}
+                                    浏览...
                                 </button>
                             </div>
                         </div>
-                    </div>
-                )}
-
-                {showFolderPicker && (
-                    <div className="modal-overlay" onClick={() => setShowFolderPicker(false)}>
-                        <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                            <h2>选择项目文件夹</h2>
-                            <FolderPicker
-                                onSelect={handlePathSelect}
-                                onCancel={() => setShowFolderPicker(false)}
-                                initialPath={newPath}
-                            />
+                        <div className="modal-actions">
+                            <button className="cancel-btn" onClick={() => setShowNewForm(false)}>
+                                取消
+                            </button>
+                            <button
+                                className="primary-btn"
+                                onClick={handleCreate}
+                                disabled={creating || !newName.trim() || !newPath.trim()}
+                            >
+                                {creating ? '正在处理...' : '确认'}
+                            </button>
                         </div>
                     </div>
-                )}
+                </div>
+            )}
 
-                {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-            </div>
+            {showFolderPicker && (
+                <div className="modal-overlay" onClick={() => setShowFolderPicker(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h2>选择项目文件夹</h2>
+                        <FolderPicker
+                            onSelect={handlePathSelect}
+                            onCancel={() => setShowFolderPicker(false)}
+                            initialPath={newPath}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
         </div>
     );
 }

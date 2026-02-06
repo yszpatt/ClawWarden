@@ -1,5 +1,25 @@
 const API_BASE = 'http://localhost:4001';
 
+async function fetchWithRetry<T>(
+    url: string,
+    options?: RequestInit,
+    retries = 5,
+    baseDelay = 500
+): Promise<T> {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const res = await fetch(url, options);
+            if (!res.ok) throw new Error(`Fetch failed with status: ${res.status}`);
+            return await res.json();
+        } catch (err) {
+            if (i === retries - 1) throw err;
+            const delay = baseDelay * Math.pow(1.5, i);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+    }
+    throw new Error('Fetch failed after retries');
+}
+
 export interface ProjectRef {
     id: string;
     name: string;
@@ -15,9 +35,7 @@ export interface ProjectData {
 }
 
 export async function fetchProjects(): Promise<ProjectRef[]> {
-    const res = await fetch(`${API_BASE}/api/projects`);
-    if (!res.ok) throw new Error('Failed to fetch projects');
-    return res.json();
+    return fetchWithRetry<ProjectRef[]>(`${API_BASE}/api/projects`);
 }
 
 export async function createProject(name: string, path: string): Promise<ProjectRef> {
@@ -38,9 +56,7 @@ export async function deleteProject(projectId: string): Promise<void> {
 }
 
 export async function fetchProjectData(projectId: string): Promise<{ project: ProjectRef; data: ProjectData }> {
-    const res = await fetch(`${API_BASE}/api/projects/${projectId}`);
-    if (!res.ok) throw new Error('Failed to fetch project data');
-    return res.json();
+    return fetchWithRetry<{ project: ProjectRef; data: ProjectData }>(`${API_BASE}/api/projects/${projectId}`);
 }
 
 export async function createTask(

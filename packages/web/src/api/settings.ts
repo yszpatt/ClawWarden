@@ -2,10 +2,28 @@ import type { GlobalSettings } from '@clawwarden/shared';
 
 const API_BASE = 'http://localhost:4001';
 
+async function fetchWithRetry<T>(
+    url: string,
+    options?: RequestInit,
+    retries = 5,
+    baseDelay = 500
+): Promise<T> {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const res = await fetch(url, options);
+            if (!res.ok) throw new Error(`Fetch failed with status: ${res.status}`);
+            return await res.json();
+        } catch (err) {
+            if (i === retries - 1) throw err;
+            const delay = baseDelay * Math.pow(1.5, i);
+            await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+    }
+    throw new Error('Fetch failed after retries');
+}
+
 export async function fetchSettings(): Promise<GlobalSettings> {
-    const res = await fetch(`${API_BASE}/api/settings`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch settings');
-    return res.json();
+    return fetchWithRetry<GlobalSettings>(`${API_BASE}/api/settings`, { cache: 'no-store' });
 }
 
 export async function updateSettings(settings: Partial<GlobalSettings>): Promise<GlobalSettings> {
@@ -15,50 +33,6 @@ export async function updateSettings(settings: Partial<GlobalSettings>): Promise
         body: JSON.stringify(settings),
     });
     if (!res.ok) throw new Error('Failed to update settings');
-    return res.json();
-}
-
-// ========== Claude Code Hooks API ==========
-
-interface HooksStatus {
-    scriptInstalled: boolean;
-    scriptPath: string;
-    settingsConfigured: boolean;
-    settingsPath: string;
-}
-
-interface HooksInstallResult {
-    success: boolean;
-    message: string;
-    installedPath?: string;
-    settingsPath?: string;
-}
-
-export async function fetchHooksStatus(): Promise<HooksStatus> {
-    const res = await fetch(`${API_BASE}/api/settings/hooks/status`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to fetch hooks status');
-    return res.json();
-}
-
-export async function installHooks(): Promise<HooksInstallResult> {
-    const res = await fetch(`${API_BASE}/api/settings/hooks/install`, {
-        method: 'POST',
-    });
-    if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to install hooks');
-    }
-    return res.json();
-}
-
-export async function uninstallHooks(): Promise<HooksInstallResult> {
-    const res = await fetch(`${API_BASE}/api/settings/hooks/uninstall`, {
-        method: 'DELETE',
-    });
-    if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || 'Failed to uninstall hooks');
-    }
     return res.json();
 }
 

@@ -6,7 +6,6 @@ import { taskRoutes } from './routes/tasks';
 import { worktreeRoutes } from './routes/worktrees';
 import { planRoutes } from './routes/plan';
 import { settingsRoutes } from './routes/settings';
-import { hookRoutes } from './routes/hooks';
 import { fsRoutes } from './routes/fs';
 import { conversationRoutes } from './routes/conversation';
 import { websocketHandler } from './websocket/handler';
@@ -37,7 +36,6 @@ export async function createServer() {
     await fastify.register(worktreeRoutes);
     await fastify.register(planRoutes);
     await fastify.register(settingsRoutes);
-    await fastify.register(hookRoutes);
     await fastify.register(fsRoutes);
     await fastify.register(conversationRoutes);
     await fastify.register(websocketHandler);

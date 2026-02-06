@@ -2,20 +2,13 @@ import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import type { GlobalSettings, ClaudeSettings, NotificationSettings } from '@clawwarden/shared';
 import { DEFAULT_SETTINGS, DEFAULT_LANES } from '@clawwarden/shared';
-import { fetchSettings, updateSettings, fetchHooksStatus, installHooks, uninstallHooks } from '../api/settings';
-
-interface HooksStatus {
-    scriptInstalled: boolean;
-    scriptPath: string;
-    settingsConfigured: boolean;
-    settingsPath: string;
-}
+import { fetchSettings, updateSettings } from '../api/settings';
 
 interface SettingsModalProps {
     onClose: () => void;
 }
 
-type TabId = 'basic' | 'claude' | 'notifications' | 'lanePrompts' | 'hooks';
+type TabId = 'basic' | 'claude' | 'notifications' | 'lanePrompts';
 
 export function SettingsModal({ onClose }: SettingsModalProps) {
     const [activeTab, setActiveTab] = useState<TabId>('basic');
@@ -24,10 +17,6 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { setTheme } = useTheme();
-
-    // Hooks management state
-    const [hooksStatus, setHooksStatus] = useState<HooksStatus | null>(null);
-    const [hooksLoading, setHooksLoading] = useState(false);
 
     useEffect(() => {
         loadSettings();
@@ -74,50 +63,11 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
         });
     };
 
-    const loadHooksStatus = async () => {
-        try {
-            setHooksLoading(true);
-            const status = await fetchHooksStatus();
-            setHooksStatus(status);
-        } catch (err) {
-            console.error('Failed to load hooks status:', err);
-        } finally {
-            setHooksLoading(false);
-        }
-    };
-
-    const handleInstallHooks = async () => {
-        try {
-            setHooksLoading(true);
-            setError(null);
-            await installHooks();
-            await loadHooksStatus();
-        } catch (err: any) {
-            setError(err.message || 'Failed to install hooks');
-        } finally {
-            setHooksLoading(false);
-        }
-    };
-
-    const handleUninstallHooks = async () => {
-        try {
-            setHooksLoading(true);
-            setError(null);
-            await uninstallHooks();
-            await loadHooksStatus();
-        } catch (err: any) {
-            setError(err.message || 'Failed to uninstall hooks');
-        } finally {
-            setHooksLoading(false);
-        }
-    };
-
     const tabs: { id: TabId; label: string }[] = [
         { id: 'basic', label: '基础' },
         { id: 'claude', label: 'Claude' },
         { id: 'notifications', label: '通知' },
         { id: 'lanePrompts', label: '泳道提示词' },
-        { id: 'hooks', label: 'Hooks' },
     ];
 
     return (
@@ -179,27 +129,6 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
 
                             {activeTab === 'claude' && (
                                 <div className="settings-section">
-                                    <div className="form-group">
-                                        <label>Claude CLI 路径</label>
-                                        <input
-                                            type="text"
-                                            value={settings.claude.cliPath}
-                                            onChange={(e) => updateClaude({ cliPath: e.target.value })}
-                                            placeholder="claude"
-                                        />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>默认执行参数</label>
-                                        <input
-                                            type="text"
-                                            value={settings.claude.defaultArgs.join(' ')}
-                                            onChange={(e) =>
-                                                updateClaude({ defaultArgs: e.target.value.split(' ').filter(Boolean) })
-                                            }
-                                            placeholder="--dangerously-skip-permissions"
-                                        />
-                                        <span className="form-hint">多个参数用空格分隔</span>
-                                    </div>
                                     <div className="form-group">
                                         <label>执行超时 (分钟)</label>
                                         <input
@@ -272,74 +201,7 @@ export function SettingsModal({ onClose }: SettingsModalProps) {
                                 </div>
                             )}
 
-                            {activeTab === 'hooks' && (
-                                <div className="settings-section hooks-section">
-                                    <div className="hooks-description">
-                                        <p style={{ marginBottom: '1rem', opacity: 0.8 }}>
-                                            Claude Code Hooks 可以在任务停止或完成时自动更新卡片状态，
-                                            无需依赖 worktree 中的 skill 文件。
-                                        </p>
-                                    </div>
 
-                                    {hooksStatus === null && !hooksLoading && (
-                                        <button className="btn-secondary" onClick={loadHooksStatus}>
-                                            检查安装状态
-                                        </button>
-                                    )}
-
-                                    {hooksLoading && (
-                                        <div className="hooks-loading">加载中...</div>
-                                    )}
-
-                                    {hooksStatus && !hooksLoading && (
-                                        <div className="hooks-status">
-                                            <div className="status-item">
-                                                <span className="status-label">Hook 脚本:</span>
-                                                <span className={`status-badge ${hooksStatus.scriptInstalled ? 'installed' : 'not-installed'}`}>
-                                                    {hooksStatus.scriptInstalled ? '✓ 已安装' : '✗ 未安装'}
-                                                </span>
-                                            </div>
-                                            {hooksStatus.scriptInstalled && (
-                                                <div className="status-path">
-                                                    路径: <code>{hooksStatus.scriptPath}</code>
-                                                </div>
-                                            )}
-
-                                            <div className="status-item" style={{ marginTop: '0.75rem' }}>
-                                                <span className="status-label">Claude 配置:</span>
-                                                <span className={`status-badge ${hooksStatus.settingsConfigured ? 'installed' : 'not-installed'}`}>
-                                                    {hooksStatus.settingsConfigured ? '✓ 已配置' : '✗ 未配置'}
-                                                </span>
-                                            </div>
-                                            {hooksStatus.settingsConfigured && (
-                                                <div className="status-path">
-                                                    配置文件: <code>{hooksStatus.settingsPath}</code>
-                                                </div>
-                                            )}
-
-                                            <div className="hooks-actions" style={{ marginTop: '1.5rem' }}>
-                                                {(!hooksStatus.scriptInstalled || !hooksStatus.settingsConfigured) ? (
-                                                    <button
-                                                        className="btn-primary"
-                                                        onClick={handleInstallHooks}
-                                                        disabled={hooksLoading}
-                                                    >
-                                                        安装 Hooks
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        className="btn-secondary btn-danger"
-                                                        onClick={handleUninstallHooks}
-                                                        disabled={hooksLoading}
-                                                    >
-                                                        卸载 Hooks
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
 
                         <div className="modal-footer">

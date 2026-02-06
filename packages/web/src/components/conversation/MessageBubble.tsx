@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertCircle, Info, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import { AlertCircle, Info, AlertTriangle, CheckCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import type { ConversationMessage, AssistantMessage } from '@clawwarden/shared';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
 
@@ -34,6 +34,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             info: Info,
             warning: AlertTriangle,
             error: AlertCircle,
+            success: CheckCircle,
         };
         const Icon = icons[message.type || 'info'];
 
