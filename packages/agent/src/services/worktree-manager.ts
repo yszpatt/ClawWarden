@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join, basename } from 'path';
-import { existsSync, rmSync } from 'fs';
+import { existsSync, rmSync, cpSync, rmSync as rm } from 'fs';
 
 const execAsync = promisify(exec);
 
@@ -163,6 +163,31 @@ export class WorktreeManager {
         } catch (error: any) {
             console.error('[WorktreeManager] Failed to create worktree:', error.message);
             throw error;
+        }
+
+        // Copy .claude directory from project to worktree if it exists
+        // Plain copy to ensure all configs are available in worktree
+        const sourceClaudeDir = join(projectPath, '.claude');
+        const targetClaudeDir = join(worktreePath, '.claude');
+        if (existsSync(sourceClaudeDir)) {
+            try {
+                cpSync(sourceClaudeDir, targetClaudeDir, { recursive: true, force: true });
+                console.log('[WorktreeManager] Copied .claude directory to worktree');
+            } catch (error: any) {
+                console.warn('[WorktreeManager] Failed to copy .claude directory:', error.message);
+                // Don't fail the worktree creation if .claude copy fails
+            }
+        }
+
+        // Cleanup: Remove deprecated .agent directory if it exists
+        const agentDir = join(worktreePath, '.agent');
+        if (existsSync(agentDir)) {
+            try {
+                rm(agentDir, { recursive: true, force: true });
+                console.log('[WorktreeManager] Removed deprecated .agent directory from worktree');
+            } catch (error: any) {
+                console.warn('[WorktreeManager] Failed to remove .agent directory:', error.message);
+            }
         }
 
         return {

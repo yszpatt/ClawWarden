@@ -177,11 +177,11 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
                             </div>
                         </div>
                         <div className="modal-actions">
-                            <button className="cancel-btn" onClick={() => setShowNewForm(false)}>
+                            <button className="btn-unified secondary" onClick={() => setShowNewForm(false)}>
                                 取消
                             </button>
                             <button
-                                className="primary-btn"
+                                className="btn-unified primary"
                                 onClick={handleCreate}
                                 disabled={creating || !newName.trim() || !newPath.trim()}
                             >

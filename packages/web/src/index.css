@@ -612,11 +612,52 @@ body {
 
 /* Legacy overrides for transition */
 .primary-btn {
-  @extend .btn-unified, .primary;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  line-height: 1.2;
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.primary-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .secondary-btn {
-  @extend .btn-unified, .secondary;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 24px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  line-height: 1.2;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.secondary-btn:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  border-color: var(--text-secondary);
+  transform: translateY(-1px);
 }
 
 /* Forms */
@@ -915,25 +956,34 @@ body {
 }
 
 .cancel-btn {
-  flex: 1;
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
-  padding: 0.75rem;
-  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 24px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--border-color);
+  line-height: 1.2;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .cancel-btn:hover {
-  background: var(--bg-card);
+  background: var(--bg-secondary);
+  border-color: var(--text-secondary);
+  transform: translateY(-1px);
 }
 
-.modal-actions .primary-btn {
+.modal-actions .btn-unified.primary {
   flex: 1;
 }
 
-.primary-btn:disabled {
+.primary-btn:disabled,
+.btn-unified:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -1364,6 +1414,22 @@ body {
 
 .picker-error {
   color: #EF4444;
+}
+
+.folder-picker-footer {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.folder-picker-footer .cancel-btn {
+  flex: none;
+}
+
+.folder-picker-footer .primary-btn {
+  flex: none;
 }
 
 /* Shared Panel Structural Classes */

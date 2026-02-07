@@ -5,7 +5,7 @@ import { promisify } from 'util';
 import { join } from 'path';
 import * as fs from 'fs';
 import { readGlobalConfig, writeGlobalConfig, initializeProject, readProjectData } from '../utils/json-store';
-import { installSkills } from '../services/skills-installer';
+import { installClaudeDirectory, hasClaudeInstalled } from '../services/claude-installer';
 import type { ProjectRef } from '@clawwarden/shared';
 
 const execAsync = promisify(exec);
@@ -49,8 +49,14 @@ export async function projectRoutes(fastify: FastifyInstance) {
     });
 
     // Register a new project
-    fastify.post<{ Body: { name: string; path: string } }>('/api/projects', async (request) => {
-        const { name, path } = request.body;
+    fastify.post<{
+        Body: {
+            name: string;
+            path: string;
+            inheritGlobalRules?: boolean;
+        }
+    }>('/api/projects', async (request) => {
+        const { name, path, inheritGlobalRules = false } = request.body;
         const config = await readGlobalConfig();
 
         // Check if project is already registered
@@ -66,24 +72,32 @@ export async function projectRoutes(fastify: FastifyInstance) {
             lastOpenedAt: new Date().toISOString(),
         };
 
-        const configPath = join(path, '.clawwarden');
-        const isExisting = fs.existsSync(configPath);
+        const clawwardenConfigPath = join(path, '.clawwarden');
+        const hasClawwarden = fs.existsSync(clawwardenConfigPath);
+        const hasClaude = hasClaudeInstalled(path);
 
-        if (!isExisting) {
+        if (!hasClawwarden && !hasClaude) {
             console.log('[Project] New project detected, initializing...');
             await initializeProject(path, project.id);
             // Auto-initialize git if not already a git repo
             await ensureGitRepo(path);
         } else {
             console.log('[Project] Existing project detected, importing...');
-            // Maybe we should update the projectId in tasks.json if it doesn't match?
-            // For now, assume it's fine.
         }
 
-        // Auto-install/update ClawWarden skills to the project
-        const installedSkills = await installSkills(path);
-        if (installedSkills.length > 0) {
-            fastify.log.info(`Installed skills: ${installedSkills.join(', ')}`);
+        // Install .claude directory (always runs, skips if exists)
+        const installResult = await installClaudeDirectory(path, {
+            inheritGlobalRules,
+            createClawWardenIntegration: true,
+            overwriteExisting: false
+        });
+
+        if (installResult.created.length > 0) {
+            fastify.log.info(`Created .claude files: ${installResult.created.join(', ')}`);
+        }
+
+        if (installResult.errors.length > 0) {
+            fastify.log.error(`Errors installing .claude: ${installResult.errors.join(', ')}`);
         }
 
         config.projects.push(project);

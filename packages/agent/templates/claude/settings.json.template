@@ -1,0 +1,30 @@
+{
+  "model": "opus",
+  "inheritGlobalSettings": false,
+  "projectSpecific": {
+    "allowedPlugins": ["everything-claude-code"],
+    "laneDefaults": {
+      "plan": {
+        "model": "opus",
+        "description": "Planning and architecture phase"
+      },
+      "develop": {
+        "model": "sonnet",
+        "description": "Active development work"
+      },
+      "test": {
+        "model": "sonnet",
+        "description": "Testing and quality assurance"
+      },
+      "pending-merge": {
+        "model": "sonnet",
+        "description": "Ready for integration"
+      },
+      "archived": {
+        "model": "haiku",
+        "description": "Completed tasks"
+      }
+    }
+  },
+  "$comment": "This is a project-specific Claude Code settings template. Sensitive environment variables like ANTHROPIC_AUTH_TOKEN are intentionally excluded. Copy this file to settings.json and customize for your project."
+}

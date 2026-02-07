@@ -1,0 +1,38 @@
+# Project Context
+
+<!-- Fill in this template with your project-specific information -->
+
+## Project Overview
+
+<!-- Describe what this project does, its purpose, and main features -->
+
+## Technology Stack
+
+<!-- List the main technologies, frameworks, and libraries used -->
+
+Example:
+- **Language**: TypeScript
+- **Framework**: React 19 + Vite
+- **Backend**: Fastify
+- **Database**: PostgreSQL
+
+## Architecture
+
+<!-- Brief description of the project architecture -->
+
+## Key Directories
+
+<!-- Describe the purpose of main directories -->
+
+Example:
+- `packages/web/` - Frontend dashboard
+- `packages/agent/` - Backend server
+- `packages/shared/` - Shared types and utilities
+
+## Development Workflow
+
+<!-- Describe how to develop, test, and build the project -->
+
+## Important Notes
+
+<!-- Any other important information for Claude to know -->

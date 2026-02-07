@@ -183,8 +183,15 @@ function renderPlanOutput(data: PlanOutput) {
                 </div>
             )}
 
-            {!((data as any).sections) && (
+            {/* SDK Structured Output */}
+            {!(data as any).sections && (
                 <>
+                    {data.summary && (
+                        <div>
+                            <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>方案概述</h4>
+                            <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.5', whiteSpace: 'pre-wrap', color: 'var(--text-primary)' }}>{data.summary}</p>
+                        </div>
+                    )}
                     {data.approach && (
                         <div>
                             <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>技术方案</h4>
@@ -197,17 +204,66 @@ function renderPlanOutput(data: PlanOutput) {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                                 {data.components.map((c: any, i: number) => (
                                     <div key={i} style={{ padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
-                                        <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{c.name}</div>
-                                        <div style={{ fontSize: '0.8rem', opacity: 0.8 }}>{c.description}</div>
+                                        <div style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem' }}>{c.name}</div>
+                                        <div style={{ fontSize: '0.8rem', opacity: 0.8, marginBottom: '0.5rem' }}>{c.description}</div>
+                                        {c.files && c.files.length > 0 && (
+                                            <div style={{ fontSize: '0.75rem', opacity: 0.6 }}>
+                                                涉及文件: {c.files.join(', ')}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    )}
+                    {data.dependencies && data.dependencies.length > 0 && (
+                        <div>
+                            <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>依赖项</h4>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                                {data.dependencies.map((dep: string, i: number) => (
+                                    <code key={i} style={{ padding: '0.25rem 0.5rem', background: 'var(--bg-tertiary)', borderRadius: '4px', fontSize: '0.75rem' }}>
+                                        {dep}
+                                    </code>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {data.considerations && data.considerations.length > 0 && (
+                        <div>
+                            <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>注意事项</h4>
+                            <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem' }}>
+                                {data.considerations.map((c: string, i: number) => <li key={i}>{c}</li>)}
+                            </ul>
+                        </div>
+                    )}
+                    {data.estimatedComplexity && (
+                        <div>
+                            <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>复杂度评估</h4>
+                            <span style={{
+                                padding: '0.25rem 0.75rem',
+                                borderRadius: '12px',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                background: getComplexityColor(data.estimatedComplexity),
+                                color: '#fff'
+                            }}>
+                                {data.estimatedComplexity.toUpperCase()}
+                            </span>
                         </div>
                     )}
                 </>
             )}
         </div>
     );
+}
+
+function getComplexityColor(complexity: string): string {
+    switch (complexity) {
+        case 'low': return '#10B981';
+        case 'medium': return '#F59E0B';
+        case 'high': return '#EF4444';
+        default: return '#6B7280';
+    }
 }
 
 function renderDevelopmentOutput(data: DevelopmentOutput) {

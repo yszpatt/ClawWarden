@@ -777,6 +777,10 @@ async function handleConversationPlanStart(
     console.log('[Execution] Starting plan generation with streaming, sessionId:', sessionId);
     console.log('[Execution] Lane prompt length:', lanePrompt.length, 'User prompt length:', userPrompt.length);
 
+    // Get output format for plan lane
+    const outputFormat = getSchemaForLane('plan');
+    console.log('[Execution] Plan output format:', outputFormat ? 'enabled' : 'none');
+
     // Create message group for this response
     const { groupId, chunkStartMsg } = createMessageGroup();
     chunkStartMsg.taskId = taskId;
@@ -789,14 +793,21 @@ async function handleConversationPlanStart(
 
     // Use query() for streaming design
     try {
+        const queryOptions: Record<string, unknown> = {
+            allowedTools: ['Read', 'Glob', 'Grep'],
+            settingSources: ['project'],
+            cwd: workingDir,
+            resume: sessionId,
+        };
+
+        // Add output format if available
+        if (outputFormat) {
+            queryOptions.outputFormat = outputFormat;
+        }
+
         for await (const sdkMessage of query({
             prompt,
-            options: {
-                allowedTools: ['Read', 'Glob', 'Grep'],
-                settingSources: ['project'],
-                cwd: workingDir,
-                resume: sessionId,
-            },
+            options: queryOptions,
         })) {
             // Check if execution was stopped
             if (executionContext.stopped) {
@@ -979,13 +990,31 @@ async function handleConversationPlanStart(
 
                     console.log('[Execution] Plan generation failed:', errorMessage);
                 } else {
-                    // Success - save design and move to next lane
+                    // Success - check if plan is truly complete
                     // Send chunk_end
                     connection.socket.send(JSON.stringify({
                         type: 'conversation.chunk_end',
                         taskId,
                         groupId,
                     } as ConversationWsMessage));
+
+                    // Check for completion signals
+                    const sdkStructuredOutput = (sdkMessage as any).structured_output;
+                    const hasStructuredOutput = !!sdkStructuredOutput;
+                    const hasCompleteMarker = /<!--\s*PLAN_COMPLETE\s*-->|\\[PLAN_COMPLETE\\]|计划完成|设计完成/i.test(currentTextContent);
+                    const parsedStructuredOutput = parsePlanToStructuredOutput(currentTextContent, task);
+                    const hasParsedTasks = parsedStructuredOutput?.data &&
+                        Array.isArray((parsedStructuredOutput.data as any).tasks) &&
+                        (parsedStructuredOutput.data as any).tasks.length > 0;
+
+                    const isPlanComplete = hasStructuredOutput || hasCompleteMarker || hasParsedTasks;
+
+                    console.log('[Execution] Plan completion check:', {
+                        hasStructuredOutput,
+                        hasCompleteMarker,
+                        hasParsedTasks,
+                        isPlanComplete
+                    });
 
                     // Only save plan if there's actual content
                     if (currentTextContent.trim().length > 0) {
@@ -999,50 +1028,79 @@ async function handleConversationPlanStart(
                         // Store planPath relative to project directory
                         task.planPath = `.clawwarden/plans/${planFileName}`;
 
-                        // Update task status and move to develop lane
-                        task.status = 'idle';
-                        task.laneId = 'develop';
-                        task.updatedAt = new Date().toISOString();
-                        await writeProjectData(project.path, data);
+                        if (isPlanComplete) {
+                            // Update task status and move to develop lane
+                            task.status = 'idle';
+                            task.laneId = 'develop';
+                            task.updatedAt = new Date().toISOString();
+                            await writeProjectData(project.path, data);
 
-                        // Send status update notification to frontend
-                        if (connection.socket.readyState === 1) {
+                            // Send status update notification to frontend
+                            if (connection.socket.readyState === 1) {
+                                connection.socket.send(JSON.stringify({
+                                    type: 'task_status',
+                                    taskId: taskId,
+                                    status: 'idle',
+                                    laneId: 'develop'
+                                }));
+                            }
+
+                            // Add completion system message
+                            const completeMessage: ConversationMessage = {
+                                id: uuid(),
+                                role: 'system',
+                                content: `[系统] 计划方案已生成并保存到: ${task.planPath}，任务已移至开发泳道`,
+                                type: 'info',
+                                timestamp: new Date().toISOString(),
+                            };
+                            await sendAndSaveMessage(connection, taskId, project.path, completeMessage);
+
                             connection.socket.send(JSON.stringify({
-                                type: 'task_status',
-                                taskId: taskId,
-                                status: 'idle',
-                                laneId: 'develop'
-                            }));
+                                type: 'conversation.plan_complete',
+                                taskId,
+                                planPath: task.planPath,
+                                content: completeMessage.content,
+                            } as ConversationWsMessage));
+                        } else {
+                            // Plan saved but not complete - waiting for more iterations or manual confirmation
+                            task.status = 'idle';
+                            task.updatedAt = new Date().toISOString();
+                            await writeProjectData(project.path, data);
+
+                            const waitingMessage: ConversationMessage = {
+                                id: uuid(),
+                                role: 'system',
+                                content: `[系统] 计划方案已保存到: ${task.planPath}。等待计划完成确认或继续对话...`,
+                                type: 'info',
+                                timestamp: new Date().toISOString(),
+                            };
+                            await sendAndSaveMessage(connection, taskId, project.path, waitingMessage);
+
+                            connection.socket.send(JSON.stringify({
+                                type: 'conversation.plan_waiting',
+                                taskId,
+                                planPath: task.planPath,
+                                content: waitingMessage.content,
+                            } as ConversationWsMessage));
                         }
 
-                        // Add completion system message
-                        const completeMessage: ConversationMessage = {
-                            id: uuid(),
-                            role: 'system',
-                            content: `[系统] 计划方案已生成并保存到: ${task.planPath}，任务已移至开发泳道`,
-                            type: 'info',
-                            timestamp: new Date().toISOString(),
-                        };
-                        await sendAndSaveMessage(connection, taskId, project.path, completeMessage);
-
-                        connection.socket.send(JSON.stringify({
-                            type: 'conversation.plan_complete',
-                            taskId,
-                            planPath: task.planPath,
-                            content: completeMessage.content,
-                        } as ConversationWsMessage));
-
                         // Also save structured-output if plan contains structured data
-                        const structuredOutput = parsePlanToStructuredOutput(currentTextContent, task);
-                        if (structuredOutput) {
-                            // task.structuredOutput = structuredOutput; // Don't save to task object
-                            await writeTaskSummary(project.path, taskId, structuredOutput);
+                        // Prefer SDK structured output over parsed markdown
+                        const structuredOutputToSave = sdkStructuredOutput ? {
+                            type: 'plan' as const,
+                            schemaVersion: '1.0',
+                            data: sdkStructuredOutput,
+                            timestamp: new Date().toISOString(),
+                        } : parsedStructuredOutput;
+
+                        if (structuredOutputToSave) {
+                            await writeTaskSummary(project.path, taskId, structuredOutputToSave);
                             await writeProjectData(project.path, data);
                             connection.socket.send(JSON.stringify({
                                 type: 'structured-output',
                                 taskId,
-                                output: structuredOutput,
-                            }));
+                                output: structuredOutputToSave.data,
+                            } as ConversationWsMessage));
                         }
 
                         console.log('[Execution] Plan saved, task updated, conversation persisted');

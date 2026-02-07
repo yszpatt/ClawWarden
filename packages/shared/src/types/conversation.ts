@@ -88,7 +88,7 @@ export interface ConversationWsMessage {
     'conversation.chunk_start' | 'conversation.chunk' | 'conversation.chunk_end' |
     'conversation.thinking' | 'conversation.tool_call_start' | 'conversation.tool_call_output' |
     'conversation.tool_call_end' | 'conversation.error' | 'conversation.plan_complete' |
-    'conversation.execute_complete' | 'task_status' | 'structured-output';
+    'conversation.plan_waiting' | 'conversation.execute_complete' | 'task_status' | 'structured-output';
     taskId: string;
     projectId?: string;
     messageId?: string;

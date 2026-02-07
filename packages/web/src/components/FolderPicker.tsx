@@ -80,11 +80,11 @@ export function FolderPicker({ onSelect, onCancel, initialPath }: FolderPickerPr
             </div>
 
             <div className="folder-picker-footer">
-                <button className="cancel-btn" onClick={onCancel}>
+                <button className="btn-unified secondary" onClick={onCancel}>
                     取消
                 </button>
                 <button
-                    className="primary-btn"
+                    className="btn-unified primary"
                     onClick={() => onSelect(currentPath)}
                     disabled={loading}
                 >

@@ -374,11 +374,18 @@ export class AgentManager extends EventEmitter {
                 try {
                     // Capture session ID
                     let currentStateSessionId = resumeSessionId || '';
+                    let sessionStartEmitted = !!resumeSessionId; // Already have session ID, will emit after setup
 
                     console.log(`[AgentManager] Starting message loop for task: ${taskId}`);
                     console.log(`[AgentManager] Initial currentStateSessionId: ${currentStateSessionId || 'none'}`);
 
                     queryInstance.streamInput(inputStream as any);
+
+                    // Emit sessionStart for resume case
+                    if (sessionStartEmitted && currentStateSessionId) {
+                        console.log(`[AgentManager] Emitting sessionStart for resumed session: ${currentStateSessionId}`);
+                        this.emit('sessionStart', { taskId, sessionId: currentStateSessionId });
+                    }
 
                     let messageCount = 0;
                     for await (const message of queryInstance) {
