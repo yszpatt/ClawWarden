@@ -106,6 +106,11 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                     setEditedPlanContent(r.content);
                 })
                 .catch(err => console.log('[TaskDetail] Plan load error:', err));
+        } else {
+            // Reset plan content when task has no planPath
+            setPlanContent(null);
+            setEditedPlanContent('');
+            setIsEditingPlan(false);
         }
     }, [projectId, task.id, fetchedTask?.planPath]);
 

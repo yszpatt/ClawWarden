@@ -556,6 +556,13 @@ export class AgentManager extends EventEmitter {
     ): Promise<string> {
         console.log(`[AgentManager] sendUserMessage for task: ${taskId}`);
 
+        // Pre-register existingSessionId in memory if provided but not already stored
+        // This ensures session continuity when resuming from file-stored session ID
+        if (existingSessionId && !this.getSessionId(taskId)) {
+            this.setSessionId(taskId, existingSessionId);
+            console.log(`[AgentManager] Pre-registered session ID from file: ${existingSessionId}`);
+        }
+
         const resumeSessionId = existingSessionId || this.getSessionId(taskId);
 
         const queryOptions: Record<string, unknown> = {

@@ -28,9 +28,15 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
 
     // Load conversation on mount
     useEffect(() => {
+        // Reset streaming state when task changes
+        setIsStreaming(false);
+
+        // Clear messages first when switching tasks
+        setMessages([]);
+
         fetchConversation(projectId, taskId)
             .then(({ conversation }) => {
-                if (conversation) {
+                if (conversation && conversation.messages.length > 0) {
                     setMessages(conversation.messages);
                 }
             })
@@ -168,6 +174,14 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
                         type: 'error',
                         timestamp: new Date().toISOString(),
                     }]);
+                    break;
+
+                case 'conversation.plan_complete':
+                case 'conversation.plan_waiting':
+                case 'conversation.execute_complete':
+                    // Ensure streaming state is reset when plan/execution completes
+                    setIsStreaming(false);
+                    currentGroupIdRef.current = undefined;
                     break;
             }
         };
