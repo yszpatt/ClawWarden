@@ -9,6 +9,7 @@ import { agentManager } from '../services/agent-manager';
 import { worktreeManager } from '../services/worktree-manager';
 import { conversationStorage } from '../services/conversation-storage';
 import { getSchemaForLane, getOutputTypeForLane } from '../services/schemas';
+import { getProjectSummaryFile, getProjectPlanFile } from '../utils/paths';
 import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task, ToolCall, AssistantMessage } from '@clawwarden/shared';
 import { getLanePrompt } from '@clawwarden/shared';
 
@@ -733,6 +734,18 @@ async function handleConversationUserMessage(
                         laneId: completeResult.task.laneId
                     }));
                 }
+
+                // Check for completion signals ONLY for plan lane
+                if (completeResult.task.laneId === 'plan') {
+                    const hasCompleteMarker = /<!--\s*PLAN_COMPLETE\s*-->|\[PLAN_COMPLETE\]|计划完成|设计完成/i.test(accumulatedContent);
+                    if (hasCompleteMarker) {
+                        console.log('[Execution] Plan complete marker detected in general dialogue turn');
+                        connection.socket.send(JSON.stringify({
+                            type: 'conversation.plan_complete_detected' as any,
+                            taskId,
+                        } as ConversationWsMessage));
+                    }
+                }
             }
         },
     };
@@ -908,7 +921,8 @@ async function handleConversationPlanStart(
                 if (event?.type === 'content_block_start' && event.block?.type === 'text') {
                     // Create new content message
                     currentContentMsgId = uuid();
-                    currentTextContent = '';
+                    // Do NOT reset currentTextContent here - we want to track the WHOLE turn's text
+                    // to detect completion markers even if split across blocks.
                 } else if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
                     const delta = event.delta.text || '';
                     currentTextContent += delta;
@@ -1206,20 +1220,32 @@ async function handleConversationPlanComplete(
         .map((m: ConversationMessage) => `${m.role}: ${m.content}`)
         .join('\n\n') || '';
 
-    // Phase 2: Generate structured output with outputFormat
+    // Phase 2: Generate structured output and Markdown spec
     const outputFormat = getSchemaForLane('plan');
-    const summaryPrompt = `根据以上对话内容，请生成结构化的计划摘要。
+    const planFilePath = getProjectPlanFile(project.path, taskId);
+    const relativePlanPath = `.clawwarden/plans/${taskId}-plan.md`;
+
+    const summaryPrompt = `你现在处于任务的“总结与最终定稿”阶段。
+请根据之前的对话内容，完成以下任务：
+
+1. **编写详细的设计文档**：
+   - 综合所有架构决策、组件改动和实现步骤。
+   - 使用 \`Write\` 工具将最终方案保存到本地文件：\`${relativePlanPath}\`。
+   - 文档应包含：## 概要, ## 技术方案, ## 组件变动, ## 实施步骤, ## 注意事项。
+
+2. **输出结构化摘要**：
+   - 按照指定的 \`outputFormat\` 提供一份精准的 JSON 摘要，包含概要、方案、组件清单和复杂度评估。
 
 对话历史：
 ${conversationContext}
 
-请输出结构化的计划方案摘要。`;
+请立即开始编写文档并输出结构化总结。`;
 
     console.log('[Execution] Generating structured plan summary with outputFormat');
 
     try {
         const queryOptions: Record<string, unknown> = {
-            allowedTools: ['Read', 'Glob', 'Grep'],
+            allowedTools: ['Read', 'Glob', 'Grep', 'Write', 'Edit'],
             settingSources: ['project'],
             cwd: workingDir,
             resume: sessionId,
@@ -1266,6 +1292,7 @@ ${conversationContext}
             // Move task to develop lane
             task.laneId = 'develop';
             task.status = 'idle';
+            task.planPath = relativePlanPath; // Link the generated plan file
             task.updatedAt = new Date().toISOString();
             await writeProjectData(project.path, data);
 

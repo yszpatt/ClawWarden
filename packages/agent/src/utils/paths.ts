@@ -19,3 +19,11 @@ export function getProjectSummaryDir(projectPath: string): string {
 export function getProjectSummaryFile(projectPath: string, taskId: string): string {
     return join(getProjectSummaryDir(projectPath), `${taskId}.json`);
 }
+
+export function getProjectPlanDir(projectPath: string): string {
+    return join(getProjectConfigDir(projectPath), 'plans');
+}
+
+export function getProjectPlanFile(projectPath: string, taskId: string): string {
+    return join(getProjectPlanDir(projectPath), `${taskId}-plan.md`);
+}
