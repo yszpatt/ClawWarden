@@ -24,12 +24,14 @@ function toToolCall(partial: Partial<ToolCall> | undefined): ToolCall | undefine
 export function useConversation({ taskId, projectId }: UseConversationOptions) {
     const [messages, setMessages] = useState<ConversationMessage[]>([]);
     const [isStreaming, setIsStreaming] = useState(false);
+    const [planCompleteDetected, setPlanCompleteDetected] = useState(false);
     const currentGroupIdRef = useRef<string | undefined>(undefined);
 
     // Load conversation on mount
     useEffect(() => {
         // Reset streaming state when task changes
         setIsStreaming(false);
+        setPlanCompleteDetected(false);
 
         // Clear messages first when switching tasks
         setMessages([]);
@@ -176,11 +178,16 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
                     }]);
                     break;
 
+                case 'conversation.plan_complete_detected':
+                    setPlanCompleteDetected(true);
+                    break;
+
                 case 'conversation.plan_complete':
                 case 'conversation.plan_waiting':
                 case 'conversation.execute_complete':
                     // Ensure streaming state is reset when plan/execution completes
                     setIsStreaming(false);
+                    setPlanCompleteDetected(false); // Reset when manually completed
                     currentGroupIdRef.current = undefined;
                     break;
             }
@@ -193,6 +200,8 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
 
     const sendMessage = useCallback(async (content: string, metadata?: Record<string, unknown>) => {
         if (isStreaming) return;
+
+        setPlanCompleteDetected(false); // Clear detection when starting new interaction
 
         const userMessage: ConversationMessage = {
             id: `user-${Date.now()}`,
@@ -211,15 +220,27 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
         });
     }, [taskId, isStreaming]);
 
+    const confirmPlan = useCallback(async () => {
+        connectionManager.send({
+            type: 'conversation.plan_complete',
+            taskId,
+            projectId,
+        });
+        setPlanCompleteDetected(false);
+    }, [taskId, projectId, projectId]);
+
     const clearMessages = useCallback(async () => {
         setMessages([]);
+        setPlanCompleteDetected(false);
         await apiClearConversation(projectId, taskId);
     }, [projectId, taskId]);
 
     return {
         messages,
         isStreaming,
+        planCompleteDetected,
         sendMessage,
+        confirmPlan,
         clearMessages,
     };
 }

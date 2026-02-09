@@ -1,5 +1,5 @@
 import { useState, useEffect, memo } from 'react';
-import { MessageSquare, FileText, Edit2, Save, X, Activity } from 'lucide-react';
+import { MessageSquare, FileText, Edit2, Save, X, Activity, Palette } from 'lucide-react';
 import { useConversation } from '../../hooks/useConversation';
 import { connectionManager } from '../../services/ConnectionManager';
 import { MessageList } from './MessageList';
@@ -54,7 +54,12 @@ const ConversationPanel = memo(function ConversationPanel({
         }
         onTabChange?.(tab);
     };
-    const { messages, isStreaming, sendMessage, clearMessages } = useConversation({ taskId, projectId });
+    const { messages, isStreaming, planCompleteDetected, sendMessage, confirmPlan, clearMessages } = useConversation({ taskId, projectId });
+
+    const handleConfirmPlan = () => {
+        confirmPlan();
+        handleTabChange('summary');
+    };
 
     // Ensure WebSocket is connected when panel mounts
     useEffect(() => {
@@ -112,6 +117,23 @@ const ConversationPanel = memo(function ConversationPanel({
                     <div className="message-list-container">
                         <MessageList messages={messages} isStreaming={isStreaming} />
                     </div>
+
+                    {planCompleteDetected && !isStreaming && (
+                        <div className="plan-confirmation-overlay">
+                            <div className="plan-confirmation-card">
+                                <div className="plan-confirmation-info">
+                                    <Palette size={20} className="text-primary animate-pulse" style={{ color: 'var(--accent)' }} />
+                                    <div>
+                                        <h4>方案讨论已就绪</h4>
+                                        <p>Claude 已标记计划完成，是否现在生成最终方案总结并进入开发阶段？</p>
+                                    </div>
+                                </div>
+                                <button className="btn-unified primary" onClick={handleConfirmPlan}>
+                                    确认并生成计划方案总结
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     <QuickActions onAction={handleQuickAction} disabled={isStreaming} />
                     <MessageInput
                         onSend={handleSend}
