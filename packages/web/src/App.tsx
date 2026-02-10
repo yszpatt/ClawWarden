@@ -74,17 +74,24 @@ function App() {
     setProjectData(null);
   };
 
-  const handleAddTask = () => {
+  const handleAddTask = (laneId: string) => {
+    // Store the target laneId for task creation
     setShowTaskForm(true);
+    (window as any).targetLaneId = laneId;
   };
 
   const handleCreateTask = async (taskData: { title: string; description: string; prompt: string }) => {
     if (!currentProject) return;
 
+    // Get the target laneId (default to 'plan' if not set)
+    const targetLaneId = (window as any).targetLaneId || 'plan';
+    // Clear the stored laneId
+    delete (window as any).targetLaneId;
+
     try {
       const newTask = await createTask(currentProject.id, {
         ...taskData,
-        laneId: 'plan', // Default to plan lane
+        laneId: targetLaneId,
       });
       addTask(newTask);
       setShowTaskForm(false);

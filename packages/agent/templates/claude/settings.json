@@ -1,0 +1,45 @@
+{
+  "model": "sonnet",
+  "enabledPlugins": {
+    "everything-claude-code@everything-claude-code": true,
+    "superpowers@superpowers-dev": true,
+    "document-skills@anthropic-agent-skills": true
+  },
+  "mcpServers": {
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "description": "Persistent memory across sessions"
+    }
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(pnpm:*)",
+      "Bash(yarn:*)",
+      "Bash(python3:*)",
+      "Bash(go:*)",
+      "Bash(git:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(rm:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf ~/.*)",
+      "Bash(rm -rf /etc/*)",
+      "Bash(rm -rf /usr/*)",
+      "Bash(rm -rf /var/*)"
+    ]
+  },
+  "_comments": {
+    "model": "sonnet for development, opus for complex tasks",
+    "plugins": "Core plugins for development workflow",
+    "mcpServers": "Add more as needed (github, supabase, filesystem, etc.)",
+    "permissions": "Allow common dev tools, deny destructive system commands"
+  }
+}

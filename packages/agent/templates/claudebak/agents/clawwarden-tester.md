@@ -3,7 +3,7 @@ name: clawwarden-tester
 description: 测试与质量保障专家。在测试泳道自动使用。
 tools: Read, Bash, Grep, Glob
 disallowedTools: Write, Edit
-model: opus
+model: sonnet
 permissionMode: default
 skills:
   - verification-before-completion

@@ -1337,10 +1337,8 @@ async function handleLaneExecutionWithAgent(
     // Get output format for this lane
     const outputFormat = getSchemaForLane(task.laneId);
 
-    // Determine allowed tools based on task's lane
-    const allowedTools = task.laneId === 'plan'
-        ? ['Read', 'Glob', 'Grep']
-        : ['Bash', 'Read', 'Edit', 'Glob', 'Grep', 'Find', 'Write'];
+    // All lanes have full tool permissions
+    const allowedTools = ['Bash', 'Read', 'Edit', 'Glob', 'Grep', 'Find', 'Write'];
 
     console.log(`[Execution] ${laneName} execution with query(), sessionId:`, sessionId);
     console.log(`[Execution] Prompt length:`, prompt.length);

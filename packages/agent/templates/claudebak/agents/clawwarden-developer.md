@@ -2,7 +2,7 @@
 name: clawwarden-developer
 description: 全栈开发专家。在开发泳道自动使用。
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch
-model: opus
+model: sonnet
 permissionMode: acceptEdits
 skills:
   - executing-plans

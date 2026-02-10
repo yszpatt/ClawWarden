@@ -28,6 +28,11 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
 
     // Load conversation on mount
     useEffect(() => {
+        // Clear messages immediately when taskId changes
+        setMessages([]);
+        setIsStreaming(false);
+        currentGroupIdRef.current = undefined;
+
         fetchConversation(projectId, taskId)
             .then(({ conversation }) => {
                 if (conversation) {

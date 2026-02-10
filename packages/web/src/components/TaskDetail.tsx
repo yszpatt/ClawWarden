@@ -20,10 +20,6 @@ interface TaskDetailProps {
 }
 
 export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDetailProps) {
-    const isRunning = task.status === 'running';
-    const [isRunningState, setIsRunningState] = useState(isRunning);
-    const taskStatusRef = useRef(task.status);
-    const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
     const [planContent, setPlanContent] = useState<string | null>(null);
     const [isEditingPlan, setIsEditingPlan] = useState(false);
     const [editedPlanContent, setEditedPlanContent] = useState('');
@@ -31,6 +27,12 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     const [structuredOutputs, setStructuredOutputs] = useState<StructuredOutput[]>([]);
     const [activeTab, setActiveTab] = useState<'conversation' | 'plan' | 'summary'>('conversation');
     const [fetchedTask, setFetchedTask] = useState<Task | null>(null);
+
+    // Track current task to ignore stale messages
+    const currentTaskIdRef = useRef(task.id);
+
+    // Derive button state from task.status (single source of truth)
+    const isTaskRunning = task.status === 'running';
 
     const { updateTask, removeTask, setProjectData, currentProject } = useAppStore();
 
@@ -49,29 +51,28 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         disconnect,
     } = useTerminalConnection(projectId, task.id, {
         onPlanComplete: (content) => {
+            // Ignore if task has changed
+            if (currentTaskIdRef.current !== task.id) return;
             setPlanContent(content);
             setEditedPlanContent(content);
-            setIsGeneratingPlan(false);
         },
         onStatusChange: (status) => {
-            if (status !== 'running') {
-                setIsGeneratingPlan(false);
-                setIsRunningState(false);
-            } else {
-                setIsRunningState(true);
-            }
+            // Ignore if task has changed
+            if (currentTaskIdRef.current !== task.id) return;
             onStatusChange?.(status as Task['status']);
         },
         onStructuredOutput: (output) => {
+            // Ignore if task has changed
+            if (currentTaskIdRef.current !== task.id) return;
             setStructuredOutputs(prev => [...prev, output as StructuredOutput]);
         }
     });
 
 
+    // Update current task ref when task changes
     useEffect(() => {
-        setIsRunningState(task.status === 'running');
-        taskStatusRef.current = task.status;
-    }, [task.status]);
+        currentTaskIdRef.current = task.id;
+    }, [task.id]);
 
     useEffect(() => {
         fetchTask(projectId, task.id)
@@ -112,8 +113,8 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     useEffect(() => () => disconnect(), []);
 
     const handleGeneratePlan = () => {
-        if (isGeneratingPlan) return;
-        setIsGeneratingPlan(true);
+        // Prevent starting if task is already running
+        if (isTaskRunning) return;
         setActiveTab('conversation');
         connectionManager.connect();
         connectionManager.send({ type: 'conversation.plan_start', taskId: task.id, projectId });
@@ -128,8 +129,6 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
 
     const handleStop = () => {
         stop();
-        setIsRunningState(false);
-        setIsGeneratingPlan(false);
         onStatusChange?.('idle');
     };
 
@@ -183,7 +182,8 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         const themeColor = getLaneColor(laneId);
 
         if (laneId === 'plan') {
-            if (isGeneratingPlan) {
+            // Plan lane: show stop button if running
+            if (isTaskRunning) {
                 return (
                     <button className="btn-unified danger" onClick={handleStop} style={{ width: '100%', padding: '0.75rem' }}>
                         <Square size={16} fill="currentColor" />
@@ -195,7 +195,7 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                 <button
                     className="btn-unified primary"
                     onClick={handleGeneratePlan}
-                    disabled={isGeneratingPlan}
+                    disabled={false}
                     style={{ width: '100%', padding: '0.75rem', background: themeColor, borderColor: themeColor }}
                 >
                     <Palette size={16} />
@@ -204,7 +204,8 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
             );
         }
         if (laneId === 'develop' || laneId === 'test') {
-            if (isRunningState) {
+            // Develop/Test lanes: show stop button if task is running
+            if (isTaskRunning) {
                 return (
                     <button className="btn-unified danger" onClick={handleStop} style={{ width: '100%', padding: '0.75rem' }}>
                         <Square size={16} fill="currentColor" />
@@ -271,11 +272,21 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         {!isEditing ? (
                             <>
-                                <button className="btn-unified ghost" onClick={() => setIsEditing(true)}>
+                                <button
+                                    className="btn-unified ghost"
+                                    onClick={() => setIsEditing(true)}
+                                    disabled={task.status === 'running'}
+                                    title={task.status === 'running' ? '任务运行中无法编辑' : undefined}
+                                >
                                     <Edit2 size={14} />
                                     编辑
                                 </button>
-                                <button className="btn-unified danger" onClick={handleDelete} title="删除任务">
+                                <button
+                                    className="btn-unified danger"
+                                    onClick={handleDelete}
+                                    title="删除任务"
+                                    disabled={task.status === 'running'}
+                                >
                                     <Trash2 size={14} />
                                 </button>
                             </>

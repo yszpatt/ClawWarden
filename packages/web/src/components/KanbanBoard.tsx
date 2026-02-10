@@ -121,7 +121,7 @@ interface KanbanLaneProps {
     tasks: Task[];
     selectedTaskId?: string;
     onTaskClick?: (task: Task) => void;
-    onAddTask?: () => void;
+    onAddTask?: (laneId: string) => void;
 }
 
 export function KanbanLane({ lane, tasks, selectedTaskId, onTaskClick, onAddTask }: KanbanLaneProps) {
@@ -151,7 +151,7 @@ export function KanbanLane({ lane, tasks, selectedTaskId, onTaskClick, onAddTask
                     </span>
                     {lane.name}
                 </span>
-                <button className="lane-add-small" onClick={onAddTask} title="Quick Add">
+                <button className="lane-add-small" onClick={() => onAddTask?.(lane.id)} title="Quick Add">
                     <Plus size={18} />
                 </button>
             </div>
@@ -178,7 +178,7 @@ interface KanbanBoardProps {
     tasks: Task[];
     selectedTaskId?: string;
     onTaskClick?: (task: Task) => void;
-    onAddTask?: () => void;
+    onAddTask?: (laneId: string) => void;
     onMoveTask?: (taskId: string, targetLaneId: string, index: number) => void;
 }
 
