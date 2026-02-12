@@ -1,7 +1,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { join, basename } from 'path';
-import { existsSync, rmSync, cpSync, rmSync as rm } from 'fs';
+import { existsSync, rmSync, cpSync, rmSync as rm, promises as fs } from 'fs';
 
 const execAsync = promisify(exec);
 
@@ -83,7 +83,7 @@ export class WorktreeManager {
             console.log('[WorktreeManager] Repository is empty, creating initial commit...');
             // Create a .gitignore file if it doesn't exist
             try {
-                await execAsync('test -f .gitignore || echo "node_modules/\n.clawwarden/\n.worktrees/" > .gitignore', { cwd: projectPath });
+                await execAsync('test -f .gitignore || echo "node_modules/\n.clawwarden/\n.worktrees/\n.claude/" > .gitignore', { cwd: projectPath });
                 await execAsync('git add -A', { cwd: projectPath });
                 await execAsync('git commit --allow-empty -m "Initial commit by ClawWarden"', { cwd: projectPath });
                 console.log('[WorktreeManager] Initial commit created');
@@ -163,6 +163,22 @@ export class WorktreeManager {
         } catch (error: any) {
             console.error('[WorktreeManager] Failed to create worktree:', error.message);
             throw error;
+        }
+
+        // Ensure .claude/ is in .gitignore inside the worktree
+        try {
+            const gitignorePath = join(worktreePath, '.gitignore');
+            let gitignoreContent = '';
+            if (existsSync(gitignorePath)) {
+                gitignoreContent = await fs.readFile(gitignorePath, 'utf-8');
+            }
+            if (!gitignoreContent.includes('.claude/')) {
+                const append = gitignoreContent.endsWith('\n') ? '.claude/\n' : (gitignoreContent ? '\n.claude/\n' : '.claude/\n');
+                await fs.appendFile(gitignorePath, append);
+                console.log('[WorktreeManager] Added .claude/ to worktree .gitignore');
+            }
+        } catch (e) {
+            console.warn('[WorktreeManager] Failed to update worktree .gitignore:', e);
         }
 
         // Copy .claude directory from project to worktree if it exists

@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Task, StructuredOutput } from '@clawwarden/shared';
-import { Square, Save, X, Trash2, GitMerge, Palette, Edit2, Info, Database, GitBranch, Code2, ShieldCheck } from 'lucide-react';
+import { Square, Save, X, Trash2, GitMerge, Palette, Edit2, Info, Database, GitBranch, Code2, ShieldCheck, Play, Package } from 'lucide-react';
 import { useTerminalConnection } from './Terminal';
 import { ConversationPanel } from './conversation/ConversationPanel';
 import { useAppStore } from '../stores/appStore';
-import { fetchPlan, updatePlan, mergeWorktree, fetchProjectData, fetchTask, fetchTaskSummary } from '../api/projects';
+import { fetchPlan, updatePlan, fetchTask, fetchTaskSummary } from '../api/projects';
 import { connectionManager } from '../services/ConnectionManager';
 
 interface TaskDetailProps {
@@ -14,11 +14,22 @@ interface TaskDetailProps {
     onStatusChange?: (status: Task['status']) => void;
 }
 
+const ActionIcon = ({ icon, size = 16 }: { icon?: string; size?: number }) => {
+    switch (icon) {
+        case 'palette': return <Palette size={size} />;
+        case 'box': return <Package size={size} />;
+        case 'code': return <Code2 size={size} />;
+        case 'shield-check': return <ShieldCheck size={size} />;
+        case 'git-merge': return <GitMerge size={size} />;
+        case 'play': return <Play size={size} />;
+        default: return <Code2 size={size} />;
+    }
+};
+
 export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDetailProps) {
     const [planContent, setPlanContent] = useState<string | null>(null);
     const [isEditingPlan, setIsEditingPlan] = useState(false);
     const [editedPlanContent, setEditedPlanContent] = useState('');
-    const [isMerging, setIsMerging] = useState(false);
     const [structuredOutputs, setStructuredOutputs] = useState<StructuredOutput[]>([]);
     const [activeTab, setActiveTab] = useState<'conversation' | 'plan' | 'summary'>('conversation');
     const [fetchedTask, setFetchedTask] = useState<Task | null>(null);
@@ -29,7 +40,7 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     // Derive button state from task.status (single source of truth)
     const isTaskRunning = task.status === 'running';
 
-    const { updateTask, removeTask, setProjectData, currentProject } = useAppStore();
+    const { updateTask, removeTask } = useAppStore();
 
     // Sync task prop changes to fetchedTask
     useEffect(() => {
@@ -130,24 +141,6 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         onStatusChange?.('idle');
     };
 
-    const handleMerge = async () => {
-        if (isMerging || !task.worktree) return;
-        setIsMerging(true);
-        try {
-            const result = await mergeWorktree(projectId, task.id);
-            if (result.success && currentProject) {
-                const { data } = await fetchProjectData(currentProject.id);
-                setProjectData(data);
-            } else if (!result.success) {
-                alert(`合并失败: ${result.message}`);
-            }
-        } catch (error: any) {
-            alert(`合并失败: ${error.message}`);
-        } finally {
-            setIsMerging(false);
-        }
-    };
-
     const [isEditing, setIsEditing] = useState(false);
     const [editForm, setEditForm] = useState({
         title: task.title,
@@ -217,23 +210,10 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                             borderColor: currentLaneConfig.color || 'var(--accent)'
                         }}
                     >
-                        {/* Dynamic Icon Mapping would go here if we had an icon map, for now just use Palette/Code2/GitMerge as fallback */}
-                        {action.id.includes('plan') ? <Palette size={16} /> :
-                            action.id.includes('test') ? <ShieldCheck size={16} /> : <Code2 size={16} />}
+                        <ActionIcon icon={action.buttonIcon} />
                         {action.buttonLabel}
                     </button>
                 ))}
-                {task.laneId === 'pending-merge' && (
-                    <button
-                        className="btn-unified primary"
-                        onClick={handleMerge}
-                        disabled={isMerging || !task.worktree}
-                        style={{ width: '100%', padding: '0.75rem', background: '#10B981', borderColor: '#10B981' }}
-                    >
-                        <GitMerge size={16} />
-                        {isMerging ? '正在合并到主分支...' : '合并到主分支 (Main)'}
-                    </button>
-                )}
             </div>
         );
     };

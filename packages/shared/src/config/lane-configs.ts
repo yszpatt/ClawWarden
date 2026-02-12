@@ -176,7 +176,7 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
         color: '#F59E0B',
         description: '合并前准备',
 
-        // 合并操作（无 Agent）
+        // 合并操作（使用 Agent 执行）
         primaryActions: [
             {
                 id: 'merge-to-main',
@@ -184,12 +184,28 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
                 buttonLabel: '合并到主分支',
                 buttonIcon: 'git-merge',
                 requiresWorktree: true,
+                systemPrompt: `你是一位资深的发布工程师。你的任务是将当前任务的工作树分支安全地合并到主分支（main/master）。
+
+## 执行步骤
+1. 确认当前分支状态：检查是否有未提交的更改。
+2. 验证测试结果：确保之前的自动化测试已通过。
+3. 执行合并：将当前开发分支合并到主分支。
+4. 冲突处理：如果发生冲突，请尝试自动修复。如果无法自动修复，请列出冲突点并请求人工干预。
+5. 清理工作：合并成功后，删除对应的本地工作树和开发分支。
+
+## 质量准则
+- 确保合并不会破坏主分支的稳定性
+- 在合并前最后运行一次关键测试（如 pnpm lint）
+- 合并信息描述要清晰准确`,
+                agentName: 'architect',
+                model: 'sonnet'
             },
         ],
 
         promptSource: 'lane-only',
         requiresPlan: false,
         generatesPlan: false,
+        onCompleteLane: 'archived',
         showInBoard: true,
         allowTaskCreation: false,
     },
