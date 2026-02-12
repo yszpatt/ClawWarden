@@ -444,19 +444,67 @@ async function handleLaneAction(
             let finalPlanPath = task.planPath;
             const currentLaneId = laneId; // The lane we just finished executing
 
-            // Summary Fallback: If agent didn't provide structured output, generate one from text
+            // Summary Fallback: Smart reconstruction if agent didn't provide structured output
             if (!taskSdkStructuredOutput && fullTextAccumulator.trim().length > 10) {
-                console.log(`[Execution] Falling back to generic summary for task ${taskId}`);
-                const fallbackOutput = {
-                    summary: fullTextAccumulator.split('\n').find(l => l.trim().length > 5)?.substring(0, 100) || '任务执行总结',
-                    details: fullTextAccumulator.substring(0, 3000),
-                    result: 'success'
-                };
+                console.log(`[Execution] Attempting smart summary reconstruction for task ${taskId} in lane ${currentLaneId}`);
 
-                // Manually trigger the event so global/local listeners handle saving and broadcasting
+                let fallbackData: any = null;
+
+                // 1. Try to find a JSON block first (Models often output JSON in markdown)
+                const jsonMatch = fullTextAccumulator.match(/```json\s*([\s\S]*?)\s*```/);
+                if (jsonMatch) {
+                    try {
+                        const parsed = JSON.parse(jsonMatch[1]);
+                        if (parsed && typeof parsed === 'object') {
+                            fallbackData = parsed;
+                            console.log(`[Execution] Successfully parsed JSON block from text for summary`);
+                        }
+                    } catch (e) { }
+                }
+
+                // 2. If no JSON, extract semantically
+                if (!fallbackData) {
+                    const text = fullTextAccumulator.trim();
+                    const lines = text.split('\n').filter(l => l.trim().length > 0);
+
+                    // Try to find a "Conclusion" or "Summary" section at the end
+                    const sections = text.split(/\n#{1,4}\s+|(?:\n|^)(?:总结|结论|结果|Summary|Conclusion|Result):\s*/i);
+                    const lastSection = sections.length > 1 ? sections[sections.length - 1] : text;
+
+                    // Heuristic for summary line: first substantial line that isn't a header or code
+                    const summaryLine = lines.find(l => l.length > 20 && !l.startsWith('#') && !l.includes('`')) || lines[0];
+
+                    fallbackData = {
+                        summary: summaryLine.substring(0, 150),
+                        details: lastSection.length > 50 ? lastSection.substring(0, 3000) : text.substring(0, 3000),
+                        result: 'success'
+                    };
+
+                    // 3. Lane-aware field completion to satisfy UI schemas
+                    if (currentLaneId === 'develop') {
+                        fallbackData.changedFiles = fallbackData.changedFiles || [];
+                        fallbackData.nextSteps = fallbackData.nextSteps || "待后续确认";
+                    } else if (currentLaneId === 'test') {
+                        fallbackData.issuesFound = fallbackData.issuesFound || [];
+                        if (!fallbackData.testResults) {
+                            const passMatch = text.match(/(\d+)\s*(?:passed|通过|成功)/i);
+                            const failMatch = text.match(/(\d+)\s*(?:failed|失败)/i);
+                            if (passMatch || failMatch) {
+                                fallbackData.testResults = {
+                                    passed: parseInt(passMatch?.[1] || '0'),
+                                    failed: parseInt(failMatch?.[1] || '0')
+                                };
+                            }
+                        }
+                    }
+                }
+
+                taskSdkStructuredOutput = fallbackData;
+
+                // Trigger global persistence and broadcast
                 agentManager.emit('structuredOutput', {
                     taskId,
-                    output: fallbackOutput,
+                    output: taskSdkStructuredOutput,
                     laneId: currentLaneId
                 });
             }
