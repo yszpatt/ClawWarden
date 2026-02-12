@@ -10,7 +10,7 @@ import { useAppStore } from './stores/appStore';
 import { DEFAULT_LANES } from '@clawwarden/shared';
 import type { Task } from '@clawwarden/shared';
 import type { ProjectRef } from './api/projects';
-import { fetchProjectData, createTask } from './api/projects';
+import { fetchProjectData, fetchLaneConfigs, createTask } from './api/projects';
 import { connectionManager } from './services/ConnectionManager';
 import './index.css';
 
@@ -24,9 +24,11 @@ function App() {
     setCurrentProject,
     projectData,
     setProjectData,
+    setLaneConfigs,
     addTask,
     moveTask,
     syncTaskUpdate,
+    laneConfigs,
   } = useAppStore();
 
   const [loading, setLoading] = useState(false);
@@ -56,8 +58,12 @@ function App() {
   const loadProjectData = async (projectId: string) => {
     try {
       setLoading(true);
-      const { data } = await fetchProjectData(projectId);
+      const [{ data }, laneConfigs] = await Promise.all([
+        fetchProjectData(projectId),
+        fetchLaneConfigs(projectId)
+      ]);
       setProjectData(data);
+      setLaneConfigs(laneConfigs);
     } catch (err) {
       console.error('Failed to load project data:', err);
     } finally {
@@ -106,7 +112,12 @@ function App() {
   }
 
   const tasks: Task[] = projectData?.tasks || [];
-  const lanes = projectData?.lanes || DEFAULT_LANES;
+  const lanes = laneConfigs ? Object.entries(laneConfigs).map(([id, cfg]) => ({
+    id,
+    name: cfg.name,
+    color: cfg.color,
+    order: cfg.order || 0
+  })).sort((a, b) => a.order - b.order) : (projectData?.lanes || DEFAULT_LANES);
   const selectedTask = tasks.find((t) => t.id === selectedTaskId);
 
   const handleTaskClick = (task: Task) => {

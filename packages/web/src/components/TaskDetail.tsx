@@ -6,11 +6,6 @@ import { ConversationPanel } from './conversation/ConversationPanel';
 import { useAppStore } from '../stores/appStore';
 import { fetchPlan, updatePlan, mergeWorktree, fetchProjectData, fetchTask, fetchTaskSummary } from '../api/projects';
 import { connectionManager } from '../services/ConnectionManager';
-import { DEFAULT_LANES } from '@clawwarden/shared';
-
-const getLaneColor = (laneId: string) => {
-    return DEFAULT_LANES.find(l => l.id === laneId)?.color || 'var(--accent)';
-};
 
 interface TaskDetailProps {
     task: Task;
@@ -72,6 +67,12 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     // Update current task ref when task changes
     useEffect(() => {
         currentTaskIdRef.current = task.id;
+        // Reset all tab-related state when switching to a different card
+        setPlanContent(null);
+        setStructuredOutputs([]);
+        setIsEditingPlan(false);
+        setEditedPlanContent('');
+        setActiveTab('conversation');
     }, [task.id]);
 
     useEffect(() => {
@@ -111,21 +112,6 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
     }, [projectId, task.id, fetchedTask?.planPath]);
 
     useEffect(() => () => disconnect(), []);
-
-    const handleGeneratePlan = () => {
-        // Prevent starting if task is already running
-        if (isTaskRunning) return;
-        setActiveTab('conversation');
-        connectionManager.connect();
-        connectionManager.send({ type: 'conversation.plan_start', taskId: task.id, projectId });
-    };
-
-    const handleExecute = () => {
-        if (!task.prompt && !task.planPath) return alert('任务没有 Prompt 或计划方案，无法执行');
-        setActiveTab('conversation');
-        connectionManager.connect();
-        connectionManager.send({ type: 'conversation.execute_start', taskId: task.id, projectId });
-    };
 
     const handleStop = () => {
         stop();
@@ -177,68 +163,67 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         }
     };
 
-    const renderMainActionButton = () => {
-        const laneId = task.laneId;
-        const themeColor = getLaneColor(laneId);
+    const { laneConfigs } = useAppStore();
+    const currentLaneConfig = laneConfigs?.[task.laneId];
 
-        if (laneId === 'plan') {
-            // Plan lane: show stop button if running
-            if (isTaskRunning) {
-                return (
-                    <button className="btn-unified danger" onClick={handleStop} style={{ width: '100%', padding: '0.75rem' }}>
-                        <Square size={16} fill="currentColor" />
-                        停止生成
+    const handleAction = (actionId: string) => {
+        if (isTaskRunning) return;
+        setActiveTab('conversation');
+        connectionManager.connect();
+        connectionManager.send({
+            type: 'conversation.lane_action_start',
+            taskId: task.id,
+            projectId,
+            laneId: task.laneId,
+            actionId
+        });
+    };
+
+    const renderMainActionButton = () => {
+        if (isTaskRunning) {
+            return (
+                <button className="btn-unified danger" onClick={handleStop} style={{ width: '100%', padding: '0.75rem' }}>
+                    <Square size={16} fill="currentColor" />
+                    停止执行
+                </button>
+            );
+        }
+
+        if (!currentLaneConfig) return null;
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {currentLaneConfig.primaryActions.map(action => (
+                    <button
+                        key={action.id}
+                        className="btn-unified primary"
+                        onClick={() => handleAction(action.id)}
+                        style={{
+                            width: '100%',
+                            padding: '0.75rem',
+                            background: currentLaneConfig.color || 'var(--accent)',
+                            borderColor: currentLaneConfig.color || 'var(--accent)'
+                        }}
+                    >
+                        {/* Dynamic Icon Mapping would go here if we had an icon map, for now just use Palette/Code2/GitMerge as fallback */}
+                        {action.id.includes('plan') ? <Palette size={16} /> :
+                            action.id.includes('test') ? <ShieldCheck size={16} /> : <Code2 size={16} />}
+                        {action.buttonLabel}
                     </button>
-                );
-            }
-            return (
-                <button
-                    className="btn-unified primary"
-                    onClick={handleGeneratePlan}
-                    disabled={false}
-                    style={{ width: '100%', padding: '0.75rem', background: themeColor, borderColor: themeColor }}
-                >
-                    <Palette size={16} />
-                    生成计划方案
-                </button>
-            );
-        }
-        if (laneId === 'develop' || laneId === 'test') {
-            // Develop/Test lanes: show stop button if task is running
-            if (isTaskRunning) {
-                return (
-                    <button className="btn-unified danger" onClick={handleStop} style={{ width: '100%', padding: '0.75rem' }}>
-                        <Square size={16} fill="currentColor" />
-                        停止执行
+                ))}
+                {task.laneId === 'pending-merge' && (
+                    <button
+                        className="btn-unified primary"
+                        onClick={handleMerge}
+                        disabled={isMerging || !task.worktree}
+                        style={{ width: '100%', padding: '0.75rem', background: '#10B981', borderColor: '#10B981' }}
+                    >
+                        <GitMerge size={16} />
+                        {isMerging ? '正在合并到主分支...' : '合并到主分支 (Main)'}
                     </button>
-                );
-            }
-            return (
-                <button
-                    className="btn-unified primary"
-                    onClick={handleExecute}
-                    disabled={!task.prompt && !task.planPath}
-                    style={{ width: '100%', padding: '0.75rem', background: themeColor, borderColor: themeColor }}
-                >
-                    {laneId === 'test' ? <ShieldCheck size={16} /> : <Code2 size={16} />}
-                    {task.status === 'failed' ? '重新执行任务' : laneId === 'test' ? '开始自动化测试' : '进入自动化开发'}
-                </button>
-            );
-        }
-        if (laneId === 'pending-merge') {
-            return (
-                <button
-                    className="btn-unified primary"
-                    onClick={handleMerge}
-                    disabled={isMerging || !task.worktree}
-                    style={{ width: '100%', padding: '0.75rem', background: themeColor, borderColor: themeColor }}
-                >
-                    <GitMerge size={16} />
-                    {isMerging ? '正在合并到主分支...' : '合并到主分支 (Main)'}
-                </button>
-            );
-        }
-        return null;
+                )}
+            </div>
+        );
     };
 
     return (

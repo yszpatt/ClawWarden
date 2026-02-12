@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import type { Task, ProjectRef, ProjectData } from '@clawwarden/shared';
+import type { Task, ProjectRef, ProjectData, LaneConfig } from '@clawwarden/shared';
 import { batchUpdateTasks, updateTask as apiUpdateTask, deleteTask as apiDeleteTask, fetchProjectData } from '../api/projects';
 
 interface AppState {
     // Current project
     currentProject: ProjectRef | null;
     projectData: ProjectData | null;
+    laneConfigs: Record<string, LaneConfig> | null;
 
     // UI state
     selectedTaskId: string | null;
@@ -14,6 +15,7 @@ interface AppState {
     // Actions
     setCurrentProject: (project: ProjectRef | null) => void;
     setProjectData: (data: ProjectData | null) => void;
+    setLaneConfigs: (configs: Record<string, LaneConfig> | null) => void;
     selectTask: (taskId: string | null) => void;
     openSidebar: () => void;
     closeSidebar: () => void;
@@ -27,10 +29,13 @@ interface AppState {
 export const useAppStore = create<AppState>((set, get) => ({
     currentProject: null,
     projectData: null,
+    laneConfigs: null,
     selectedTaskId: null,
     sidebarOpen: false,
 
     setCurrentProject: (project) => set({ currentProject: project }),
+
+    setLaneConfigs: (configs) => set({ laneConfigs: configs }),
 
     setProjectData: (data) => {
         if (data) {

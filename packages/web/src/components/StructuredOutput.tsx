@@ -79,7 +79,7 @@ function SingleOutputViewer({ output, defaultExpanded = false }: { output: Struc
                         flexShrink: 0,
                         marginTop: '2px'
                     }}>
-                        {output.type}
+                        {getOutputTypeLabel(output.type)}
                     </span>
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                         <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', lineHeight: '1.4' }}>
@@ -119,11 +119,22 @@ function SingleOutputViewer({ output, defaultExpanded = false }: { output: Struc
     );
 }
 
+function getOutputTypeLabel(type: string): string {
+    switch (type) {
+        case 'plan': return '计划';
+        case 'development': return '开发';
+        case 'testing': return '测试';
+        case 'analysis': return '分析';
+        default: return '总结';
+    }
+}
+
 function getOutputTypeColor(type: string): string {
     switch (type) {
         case 'plan': return '#8B5CF6';
-        case 'development': return '#10B981';
-        case 'testing': return '#F59E0B';
+        case 'development': return '#3B82F6';
+        case 'testing': return '#10B981';
+        case 'analysis': return '#6366F1';
         default: return '#6B7280';
     }
 }
@@ -144,6 +155,14 @@ function renderOutputContent(type: string, data: any) {
 function renderGenericOutput(data: any) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {data.summary && (
+                <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>总结</h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.6', color: 'var(--text-primary)' }}>
+                        {data.summary}
+                    </p>
+                </div>
+            )}
             {data.details && (
                 <div>
                     <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>详情</h4>
@@ -153,7 +172,7 @@ function renderGenericOutput(data: any) {
                 </div>
             )}
             {/* Generic fallback for unexpected data */}
-            {!data.details && (
+            {!data.details && !data.summary && (
                 <pre style={{ fontSize: '0.75rem', overflow: 'auto', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: '4px' }}>
                     {JSON.stringify(data, null, 2)}
                 </pre>
@@ -269,6 +288,12 @@ function getComplexityColor(complexity: string): string {
 function renderDevelopmentOutput(data: DevelopmentOutput) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {data.summary && (
+                <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>实施总结</h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-primary)' }}>{data.summary}</p>
+                </div>
+            )}
             {data.changes && data.changes.length > 0 && (
                 <div>
                     <h4 style={{ margin: '0 0 0.75rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>变更详情</h4>
@@ -299,6 +324,26 @@ function renderDevelopmentOutput(data: DevelopmentOutput) {
                     </div>
                 </div>
             )}
+            {data.testsAdded && data.testsAdded.length > 0 && (
+                <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>新增测试</h4>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        {data.testsAdded.map((test, i) => (
+                            <code key={i} style={{ padding: '0.25rem 0.5rem', background: 'var(--bg-tertiary)', borderRadius: '4px', fontSize: '0.75rem' }}>
+                                {test}
+                            </code>
+                        ))}
+                    </div>
+                </div>
+            )}
+            {data.breakingChanges && data.breakingChanges.length > 0 && (
+                <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#EF4444', fontSize: '0.9rem' }}>破坏性变更</h4>
+                    <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: '#EF4444' }}>
+                        {data.breakingChanges.map((bc, i) => <li key={i}>{bc}</li>)}
+                    </ul>
+                </div>
+            )}
             {data.nextSteps && data.nextSteps.length > 0 && (
                 <div>
                     <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>后续步骤</h4>
@@ -314,6 +359,12 @@ function renderDevelopmentOutput(data: DevelopmentOutput) {
 function renderTestingOutput(data: TestingOutput) {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {data.summary && (
+                <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>测试总结</h4>
+                    <p style={{ margin: 0, fontSize: '0.85rem', lineHeight: '1.5', color: 'var(--text-primary)' }}>{data.summary}</p>
+                </div>
+            )}
             <div style={{ display: 'flex', gap: '1rem' }}>
                 <div style={{ flex: 1, padding: '0.75rem', background: 'var(--bg-secondary)', borderRadius: '8px', textAlign: 'center' }}>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>通过率</div>
@@ -338,6 +389,22 @@ function renderTestingOutput(data: TestingOutput) {
                                 {issue.location && <code style={{ fontSize: '0.7rem', opacity: 0.6 }}>{issue.location}</code>}
                             </div>
                         ))}
+                    </div>
+                </div>
+            )}
+            {data.coverage && (
+                <div>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--accent)', fontSize: '0.9rem' }}>代码覆盖率</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                        {data.coverage.lines !== undefined && (
+                            <div style={{ fontSize: '0.8rem' }}>行覆盖率: <strong>{data.coverage.lines}%</strong></div>
+                        )}
+                        {data.coverage.functions !== undefined && (
+                            <div style={{ fontSize: '0.8rem' }}>函数覆盖率: <strong>{data.coverage.functions}%</strong></div>
+                        )}
+                        {data.coverage.branches !== undefined && (
+                            <div style={{ fontSize: '0.8rem' }}>分支覆盖率: <strong>{data.coverage.branches}%</strong></div>
+                        )}
                     </div>
                 </div>
             )}

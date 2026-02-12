@@ -57,6 +57,29 @@ export class ConversationStorage {
     }
 
     /**
+     * Update an existing message in a conversation by ID.
+     * Returns true if the message was found and updated, false otherwise.
+     */
+    async updateMessage(projectPath: string, taskId: string, messageId: string, updater: (msg: ConversationMessage) => ConversationMessage): Promise<boolean> {
+        const conversation = await this.load(projectPath, taskId);
+        if (!conversation) return false;
+
+        let found = false;
+        conversation.messages = conversation.messages.map(msg => {
+            if (msg.id === messageId) {
+                found = true;
+                return updater(msg);
+            }
+            return msg;
+        });
+
+        if (found) {
+            await this.save(projectPath, conversation);
+        }
+        return found;
+    }
+
+    /**
      * Clear all messages in a conversation
      */
     async clear(projectPath: string, taskId: string): Promise<void> {

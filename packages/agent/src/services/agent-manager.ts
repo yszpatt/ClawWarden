@@ -20,6 +20,7 @@ export interface AgentCallbacks {
     onConversationThinkingStart?: (content: string) => void;
     onConversationThinkingEnd?: () => void;
     onConversationToolCall?: (toolCall: ToolCall) => void;
+    onConversationChunkEnd?: (messageId: string) => void;
     onConversationComplete?: (messageId: string) => void;
 }
 
@@ -224,6 +225,7 @@ export class AgentManager extends EventEmitter {
         claudeSessionId?: string;
         outputBuffer: string;
         completed?: boolean;  // Mark as completed to allow historical output viewing
+        laneId?: string;      // Lane ID when execution started
     }> = new Map();
 
     private initializingTasks = new Set<string>();
@@ -248,7 +250,8 @@ export class AgentManager extends EventEmitter {
         projectPath: string,
         prompt: string,
         resumeSessionId?: string,
-        outputFormat?: { type: 'json_schema'; schema: Record<string, unknown> }
+        outputFormat?: { type: 'json_schema'; schema: Record<string, unknown> },
+        laneId?: string
     ): Promise<string> { // Returns Claude Session ID
         // Mark as initializing immediately to prevent race conditions
         this.initializingTasks.add(taskId);
@@ -362,7 +365,8 @@ export class AgentManager extends EventEmitter {
                 inputNotify,
                 inputStream,
                 claudeSessionId: resumeSessionId,
-                outputBuffer: ''
+                outputBuffer: '',
+                laneId
             });
 
             // Initialization complete
@@ -472,7 +476,8 @@ export class AgentManager extends EventEmitter {
                             // Check for structured output
                             if ((message as any).structured_output) {
                                 console.log(`[AgentManager] Structured output received for task ${taskId}:`, JSON.stringify((message as any).structured_output, null, 2));
-                                this.emit('structuredOutput', { taskId, output: (message as any).structured_output });
+                                const session = this.sessions.get(taskId);
+                                this.emit('structuredOutput', { taskId, output: (message as any).structured_output, laneId: session?.laneId });
                             }
                             if (message.subtype === 'success') {
                                 taskSuccess = true;
@@ -552,17 +557,26 @@ export class AgentManager extends EventEmitter {
         projectPath: string,
         userMessage: string,
         callbacks?: AgentCallbacks,
-        existingSessionId?: string
+        existingSessionId?: string,
+        options?: {
+            allowedTools?: string[];
+            outputFormat?: { type: 'json_schema'; schema: Record<string, unknown> };
+            laneId?: string;
+        }
     ): Promise<string> {
         console.log(`[AgentManager] sendUserMessage for task: ${taskId}`);
 
         const resumeSessionId = existingSessionId || this.getSessionId(taskId);
 
         const queryOptions: Record<string, unknown> = {
-            allowedTools: ['Read', 'Glob', 'Grep', 'Bash'],
+            allowedTools: options?.allowedTools || ['Read', 'Glob', 'Grep', 'Bash'],
             settingSources: ['project'],
             cwd: projectPath,
         };
+
+        if (options?.outputFormat) {
+            queryOptions.outputFormat = options.outputFormat;
+        }
 
         try {
             let messageId = this.generateMessageId();
@@ -575,7 +589,11 @@ export class AgentManager extends EventEmitter {
             })) {
                 console.log('[AgentManager] sendUserMessage received message type:', message.type, 'event:', (message as any).event?.type);
 
-                // Store session ID
+                if (message.type === 'system') {
+                    console.log('[AgentManager] System message:', (message as any).message?.content);
+                }
+
+                // Handle session ID
                 if ((message as any).session_id && !this.getSessionId(taskId)) {
                     this.setSessionId(taskId, (message as any).session_id);
                     callbacks?.onSessionStart?.((message as any).session_id);
@@ -591,11 +609,12 @@ export class AgentManager extends EventEmitter {
                         callbacks?.onConversationChunk?.(messageId, '');
                     } else if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
                         const delta = event.delta.text || '';
-                        console.log('[AgentManager] text_delta:', delta.slice(0, 50));
+                        // log infrequently to avoid log spam
+                        if (Math.random() < 0.1) console.log('[AgentManager] text_delta length:', delta.length);
                         callbacks?.onConversationChunk?.(messageId, delta);
                     } else if (event?.type === 'content_block_stop') {
                         console.log('[AgentManager] content_block_stop');
-                        callbacks?.onConversationComplete?.(messageId);
+                        callbacks?.onConversationChunkEnd?.(messageId);
                         messageId = this.generateMessageId();
                         pendingToolCalls.clear();
                     }
@@ -604,12 +623,21 @@ export class AgentManager extends EventEmitter {
                 // Handle assistant messages (tool use, text blocks)
                 else if (message.type === 'assistant') {
                     const content = (message as any).message?.content;
+                    let hasTextBlock = false;
                     if (Array.isArray(content)) {
                         for (const block of content) {
                             if (block.type === 'text') {
-                                console.log('[AgentManager] assistant text block:', block.text?.slice(0, 50));
+                                console.log('[AgentManager] assistant text block length:', block.text?.length);
                                 callbacks?.onConversationChunk?.(messageId, block.text || '');
+                                hasTextBlock = true;
                             } else if (block.type === 'tool_use') {
+                                // Flush any accumulated text before tool use
+                                if (hasTextBlock) {
+                                    console.log('[AgentManager] Flushing text before tool_use in assistant message');
+                                    await callbacks?.onConversationChunkEnd?.(messageId);
+                                    messageId = this.generateMessageId();
+                                    hasTextBlock = false;
+                                }
                                 const toolName = block.name;
                                 const toolInput = block.input;
                                 const toolId = `${messageId}-${toolName}`;
@@ -623,6 +651,12 @@ export class AgentManager extends EventEmitter {
                                 console.log('[AgentManager] tool_use:', toolName);
                                 callbacks?.onConversationToolCall?.(toolCall);
                             }
+                        }
+                        // Flush remaining text after processing all blocks
+                        if (hasTextBlock) {
+                            console.log('[AgentManager] Flushing remaining text after assistant message blocks');
+                            await callbacks?.onConversationChunkEnd?.(messageId);
+                            messageId = this.generateMessageId();
                         }
                     }
                 }
@@ -647,18 +681,27 @@ export class AgentManager extends EventEmitter {
                     }
                 }
 
+                // Handle structured output (can happen in any message or as separate property)
+                if ((message as any).structured_output) {
+                    const output = (message as any).structured_output;
+                    console.log(`[AgentManager] sendUserMessage - Structured output received:`, JSON.stringify(output, null, 2));
+                    callbacks?.onStructuredOutput?.(output);
+                    this.emit('structuredOutput', { taskId, output, laneId: options?.laneId });
+                }
+
                 // Handle completion
-                else if (message.type === 'result') {
-                    // Always call onConversationComplete when result is received to end streaming
-                    console.log('[AgentManager] result received, calling onConversationComplete');
-                    callbacks?.onConversationComplete?.(messageId);
+                if (message.type === 'result') {
+                    // Flush any remaining text before completing
+                    console.log('[AgentManager] result received, flushing remaining text and calling onConversationComplete');
+                    await callbacks?.onConversationChunkEnd?.(messageId);
+                    await callbacks?.onConversationComplete?.(messageId);
 
                     if ((message as any).subtype === 'success') {
                         console.log('[AgentManager] sendUserMessage completed successfully');
                     } else if ((message as any).subtype === 'error_during_execution') {
                         const error = new Error((message as any).errors?.join('\n') || 'Unknown error');
                         if (callbacks?.onError) {
-                            callbacks.onError(error);
+                            await callbacks.onError(error);
                         } else {
                             throw error;
                         }
@@ -666,6 +709,7 @@ export class AgentManager extends EventEmitter {
                 }
             }
 
+            console.log(`[AgentManager] sendUserMessage query loop finished for task: ${taskId}`);
             return resumeSessionId || '';
 
         } catch (error: any) {

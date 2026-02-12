@@ -55,8 +55,14 @@ export async function deleteProject(projectId: string): Promise<void> {
     if (!res.ok) throw new Error('Failed to delete project');
 }
 
+import type { LaneConfig } from '@clawwarden/shared';
+
 export async function fetchProjectData(projectId: string): Promise<{ project: ProjectRef; data: ProjectData }> {
     return fetchWithRetry<{ project: ProjectRef; data: ProjectData }>(`${API_BASE}/api/projects/${projectId}`);
+}
+
+export async function fetchLaneConfigs(projectId: string): Promise<Record<string, LaneConfig>> {
+    return fetchWithRetry<Record<string, LaneConfig>>(`${API_BASE}/api/projects/${projectId}/lane-configs`);
 }
 
 export async function createTask(

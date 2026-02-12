@@ -76,6 +76,8 @@ export async function projectRoutes(fastify: FastifyInstance) {
         const hasClawwarden = fs.existsSync(clawwardenConfigPath);
         const hasClaude = hasClaudeInstalled(path);
 
+        const { generateProjectLaneConfig, PROJECT_LANE_CONFIG_FILE } = await import('../utils/lane-config-loader');
+
         if (!hasClawwarden && !hasClaude) {
             console.log('[Project] New project detected, initializing...');
             await initializeProject(path, project.id);
@@ -83,6 +85,11 @@ export async function projectRoutes(fastify: FastifyInstance) {
             await ensureGitRepo(path);
         } else {
             console.log('[Project] Existing project detected, importing...');
+        }
+
+        // Ensure lane config exists
+        if (!fs.existsSync(join(path, PROJECT_LANE_CONFIG_FILE))) {
+            await generateProjectLaneConfig(path);
         }
 
         // Install .claude directory (always runs, skips if exists)
@@ -113,7 +120,33 @@ export async function projectRoutes(fastify: FastifyInstance) {
         if (!project) throw { statusCode: 404, message: 'Project not found' };
 
         const data = await readProjectData(project.path);
+
+        // Also ensure lane config exists for existing projects being opened
+        const { generateProjectLaneConfig, PROJECT_LANE_CONFIG_FILE } = await import('../utils/lane-config-loader');
+        if (!fs.existsSync(join(project.path, PROJECT_LANE_CONFIG_FILE))) {
+            await generateProjectLaneConfig(project.path);
+        }
+
         return { project, data };
+    });
+
+    // Get merged lane configurations
+    fastify.get<{ Params: { id: string } }>('/api/projects/:id/lane-configs', async (request) => {
+        const config = await readGlobalConfig();
+        const project = config.projects.find(p => p.id === request.params.id);
+        if (!project) throw { statusCode: 404, message: 'Project not found' };
+
+        // We need an utility to get all merged configs for a project
+        const { DEFAULT_LANE_CONFIGS } = await import('@clawwarden/shared');
+        const { getMergedLaneConfig } = await import('../utils/lane-config-loader');
+
+        const mergedConfigs: Record<string, any> = {};
+
+        for (const [laneId, defaultConfig] of Object.entries(DEFAULT_LANE_CONFIGS)) {
+            mergedConfigs[laneId] = await getMergedLaneConfig(laneId, project.path, defaultConfig as any);
+        }
+
+        return mergedConfigs;
     });
 
     // Delete project

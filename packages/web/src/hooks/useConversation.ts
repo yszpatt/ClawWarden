@@ -169,8 +169,8 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
                     setMessages(prev => [...prev, {
                         id: `error-${Date.now()}`,
                         role: 'system',
-                        content: message.error ?? 'An error occurred',
-                        type: 'error',
+                        content: message.error ?? message.content ?? 'An error occurred',
+                        type: (message.error ?? message.content ?? '').startsWith('[系统]') ? 'info' : 'error',
                         timestamp: new Date().toISOString(),
                     }]);
                     break;
