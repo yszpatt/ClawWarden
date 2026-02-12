@@ -16,6 +16,91 @@ import { getLanePrompt, getLaneConfig } from '@clawwarden/shared';
 // Maps taskId to an abort controller or stop flag
 const runningLaneExecutions = new Map<string, { stopped: boolean; connection: SocketStream }>();
 
+// Auto-execution: concurrency control
+const MAX_CONCURRENT_AUTO_EXECUTIONS = 2;
+const MAX_AUTO_TRANSITIONS = 5;
+const activeAutoExecutions = new Set<string>();
+
+/**
+ * Auto-execution: schedule next lane action after a delay.
+ * Safety guards: concurrency limit, WebSocket alive check, transition count limit.
+ */
+async function scheduleNextLaneExecution(
+    connection: SocketStream,
+    taskId: string,
+    projectPath: string,
+    targetLaneId: string
+): Promise<void> {
+    setTimeout(async () => {
+        try {
+            // Concurrency limit
+            if (activeAutoExecutions.size >= MAX_CONCURRENT_AUTO_EXECUTIONS) {
+                console.warn(`[AutoExec] Max concurrent limit reached, pausing task ${taskId}`);
+                await patchTask(taskId, { status: 'awaiting-review' });
+                if (connection.socket.readyState === 1) {
+                    connection.socket.send(JSON.stringify({ type: 'task_status', taskId, status: 'awaiting-review', laneId: targetLaneId }));
+                }
+                return;
+            }
+
+            // WebSocket alive check
+            if (connection.socket.readyState !== 1) {
+                console.warn(`[AutoExec] WebSocket disconnected, stopping auto-execution for task ${taskId}`);
+                await patchTask(taskId, { status: 'awaiting-review' });
+                return;
+            }
+
+            const result = await findTask(taskId);
+            if (!result) return;
+            const { task, data } = result;
+
+            // Verify task is in expected state
+            if (task.laneId !== targetLaneId || task.status === 'running') return;
+            if (!task.autoExecute) return;
+
+            // Transition count limit (loop prevention)
+            const count = (task.metadata?.autoTransitionCount as number) || 0;
+            if (count >= MAX_AUTO_TRANSITIONS) {
+                console.error(`[AutoExec] Max transitions (${MAX_AUTO_TRANSITIONS}) reached for task ${taskId}`);
+                await patchTask(taskId, { status: 'failed' });
+                if (connection.socket.readyState === 1) {
+                    connection.socket.send(JSON.stringify({ type: 'task_status', taskId, status: 'failed', laneId: targetLaneId }));
+                }
+                return;
+            }
+            await patchTask(taskId, { metadata: { ...task.metadata, autoTransitionCount: count + 1 } });
+
+            const laneConfig = await getMergedLaneConfig(targetLaneId, result.project.path);
+            const primaryAction = laneConfig.primaryActions[0];
+            if (!primaryAction) {
+                console.warn(`[AutoExec] No primary action found for lane ${targetLaneId}`);
+                return;
+            }
+
+            console.log(`[AutoExec] Scheduling action '${primaryAction.id}' in lane '${targetLaneId}' for task ${taskId}`);
+
+            activeAutoExecutions.add(taskId);
+            try {
+                await handleLaneAction(connection, {
+                    type: 'conversation.lane_action_start',
+                    taskId,
+                    projectId: data.projectId || '',
+                    laneId: targetLaneId,
+                    actionId: primaryAction.id
+                });
+            } finally {
+                activeAutoExecutions.delete(taskId);
+            }
+        } catch (error) {
+            console.error(`[AutoExec] Failed to schedule next lane execution:`, error);
+            await patchTask(taskId, { status: 'failed' });
+            if (connection.socket.readyState === 1) {
+                connection.socket.send(JSON.stringify({ type: 'task_status', taskId, status: 'failed' }));
+            }
+        }
+    }, 1500);
+}
+
 /**
  * Send a WebSocket message and immediately save to conversation storage
  */
@@ -357,6 +442,24 @@ async function handleLaneAction(
             let finalStatus: TaskStatus = 'idle';
             let finalLaneId = task.laneId;
             let finalPlanPath = task.planPath;
+            const currentLaneId = laneId; // The lane we just finished executing
+
+            // Summary Fallback: If agent didn't provide structured output, generate one from text
+            if (!taskSdkStructuredOutput && fullTextAccumulator.trim().length > 10) {
+                console.log(`[Execution] Falling back to generic summary for task ${taskId}`);
+                const fallbackOutput = {
+                    summary: fullTextAccumulator.split('\n').find(l => l.trim().length > 5)?.substring(0, 100) || '任务执行总结',
+                    details: fullTextAccumulator.substring(0, 3000),
+                    result: 'success'
+                };
+
+                // Manually trigger the event so global/local listeners handle saving and broadcasting
+                agentManager.emit('structuredOutput', {
+                    taskId,
+                    output: fallbackOutput,
+                    laneId: currentLaneId
+                });
+            }
 
             if (laneConfig.generatesPlan) {
                 const hasCompleteMarker = /<!--\s*PLAN_COMPLETE\s*-->|\[PLAN_COMPLETE\]|计划完成|设计完成|方案完成|方案已生成/i.test(fullTextAccumulator);
@@ -388,11 +491,6 @@ async function handleLaneAction(
                     await fs.writeFile(path.join(plansDir, planFileName), planContent, 'utf-8');
                     finalPlanPath = `.clawwarden/plans/${planFileName}`;
 
-                    if (laneConfig.onCompleteLane) {
-                        finalLaneId = laneConfig.onCompleteLane;
-                        console.log(`[Execution] Plan complete, target lane: ${finalLaneId}`);
-                    }
-
                     if (connection.socket.readyState === 1) {
                         connection.socket.send(JSON.stringify({
                             type: 'conversation.plan_complete',
@@ -401,10 +499,33 @@ async function handleLaneAction(
                             content: planContent
                         }));
                     }
+
+                    // Auto-execution check for plan lane
+                    if (task.autoExecute && laneConfig.onCompleteLane) {
+                        finalLaneId = laneConfig.onCompleteLane;
+                        console.log(`[AutoExec] Plan complete, auto-moving to: ${finalLaneId}`);
+                        scheduleNextLaneExecution(connection, taskId, projectPath, finalLaneId);
+                    } else if (laneConfig.onCompleteLane) {
+                        // Manual mode: stay in current lane, mark awaiting-review
+                        // Summary is saved independently via global structuredOutput listener
+                        finalStatus = 'awaiting-review';
+                        console.log(`[Execution] Plan complete (manual mode), awaiting review`);
+                    }
                 }
             } else if (laneConfig.onCompleteLane) {
-                finalLaneId = laneConfig.onCompleteLane;
-                console.log(`[Execution] Action complete, target lane: ${finalLaneId}`);
+                if (task.autoExecute) {
+                    finalLaneId = laneConfig.onCompleteLane;
+                    console.log(`[AutoExec] Action complete, auto-moving to: ${finalLaneId}`);
+                    // Don't auto-execute in pending-merge — it's the stopping point
+                    if (finalLaneId !== 'pending-merge') {
+                        scheduleNextLaneExecution(connection, taskId, projectPath, finalLaneId);
+                    }
+                } else {
+                    // Manual mode: stay in current lane, mark awaiting-review
+                    // Summary is saved independently via global structuredOutput listener
+                    finalStatus = 'awaiting-review';
+                    console.log(`[Execution] Action complete (manual mode), awaiting review`);
+                }
             }
 
             // Perform atomic update using helper to avoid race conditions with global listeners
@@ -451,8 +572,13 @@ async function handleLaneAction(
         );
 
         // After sending finishes, ensures we are in idle state if not explicitly stopped
+        // BUT only if onConversationComplete hasn't already set a specific status (e.g., awaiting-review)
         if (!executionContext.stopped) {
-            await patchTask(taskId, { status: 'idle' });
+            const currentTask = await findTask(taskId);
+            const currentStatus = currentTask?.task?.status;
+            if (currentStatus === 'running') {
+                await patchTask(taskId, { status: 'idle' });
+            }
         }
     } catch (error: any) {
         await patchTask(taskId, { status: 'failed' });
@@ -516,15 +642,28 @@ export async function executionHandler(fastify: FastifyInstance) {
                     const data = await readProjectData(proj.path);
                     const task = data.tasks.find(t => t.id === event.taskId);
                     if (task) {
-                        const laneConfig = await getMergedLaneConfig(task.laneId, proj.path);
-                        if (laneConfig.onCompleteLane) targetLane = laneConfig.onCompleteLane;
+                        if (task.autoExecute) {
+                            const laneConfig = await getMergedLaneConfig(task.laneId, proj.path);
+                            if (laneConfig.onCompleteLane) targetLane = laneConfig.onCompleteLane;
+                        } else {
+                            // Manual mode: don't move, mark awaiting-review
+                            event.status = 'awaiting-review' as TaskStatus;
+                        }
                         break;
                     }
                 }
             }
-            await patchTask(event.taskId, { status: event.status, laneId: targetLane });
+            const patch: any = { status: event.status };
+            if (targetLane) patch.laneId = targetLane;
+
+            await patchTask(event.taskId, patch);
             if (connection.socket.readyState === 1) {
-                connection.socket.send(JSON.stringify({ type: 'task_status', taskId: event.taskId, status: event.status, laneId: targetLane }));
+                connection.socket.send(JSON.stringify({
+                    type: 'task_status',
+                    taskId: event.taskId,
+                    status: event.status,
+                    laneId: targetLane || undefined
+                }));
             }
             if (event.status === 'completed' || event.status === 'failed') {
                 if (connection.socket.readyState === 1) {
@@ -578,7 +717,7 @@ export async function executionHandler(fastify: FastifyInstance) {
                 const message = JSON.parse(rawMessage.toString()) as ClientMessage;
                 switch (message.type) {
                     case 'execute': currentTaskId = message.taskId; await handleExecute(connection, message); break;
-                    case 'stop': if (message.taskId) handleStop(message.taskId); break;
+                    case 'stop': if (message.taskId) await handleStop(message.taskId, connection); break;
                     case 'attach': currentTaskId = (message as any).taskId; await handleAttach(connection, message as AttachMessage); break;
                     case 'conversation.user_input': currentTaskId = message.taskId; await handleConversationUserMessage(connection, message); break;
                     case 'conversation.lane_action_start': currentTaskId = message.taskId; await handleLaneAction(connection, message as ConversationLaneActionStartMessage); break;
@@ -638,7 +777,41 @@ async function handleExecute(connection: SocketStream, message: ExecuteMessage) 
 
     const primaryAction = laneConfig.primaryActions[0];
     const outputFormat = primaryAction?.outputSchema ? { type: (primaryAction.outputFormat || 'json_schema') as any, schema: primaryAction.outputSchema } : getSchemaForLane(task.laneId);
-    await agentManager.startTaskExecution(task.id, workingDir, prompt, task.claudeSession?.id, outputFormat, task.laneId);
+    await agentManager.startTaskExecution(
+        task.id,
+        workingDir,
+        prompt,
+        task.claudeSession?.id,
+        outputFormat,
+        task.laneId,
+        {
+            onLog: (msg) => {
+                if (connection.socket.readyState === 1) {
+                    connection.socket.send(JSON.stringify({ type: 'output', taskId: task.id, data: `\x1b[36m${msg}\x1b[0m` }));
+                }
+            },
+            onOutput: (data) => {
+                if (connection.socket.readyState === 1) {
+                    connection.socket.send(JSON.stringify({ type: 'output', taskId: task.id, data }));
+                }
+            },
+            onError: (err) => {
+                if (connection.socket.readyState === 1) {
+                    connection.socket.send(JSON.stringify({ type: 'output', taskId: task.id, data: `\x1b[31m[Error] ${err.message}\x1b[0m` }));
+                }
+            },
+            onStatusUpdate: async (status, moveTo) => {
+                await patchTask(task.id, { status, laneId: moveTo || task.laneId });
+                if (connection.socket.readyState === 1) {
+                    connection.socket.send(JSON.stringify({ type: 'task_status', taskId: task.id, status, laneId: moveTo || task.laneId }));
+                }
+            }
+        }
+    );
+
+    // Register for stop functionality
+    runningLaneExecutions.set(task.id, { stopped: false, connection });
+
     const buffered = agentManager.getSessionOutput(task.id);
     if (buffered) connection.socket.send(JSON.stringify({ type: 'output', taskId: task.id, data: buffered }));
 }
@@ -647,29 +820,60 @@ async function handleAttach(connection: SocketStream, message: AttachMessage) {
     const buffered = agentManager.getSessionOutput(message.taskId);
     if (buffered !== undefined) {
         const session = agentManager.getSessionInfo(message.taskId);
+
+        // Update connection for stop functionality and status broadcasts
+        const existing = runningLaneExecutions.get(message.taskId);
+        if (existing) {
+            existing.connection = connection;
+        } else {
+            runningLaneExecutions.set(message.taskId, { stopped: false, connection });
+        }
+
         connection.socket.send(JSON.stringify({ type: 'attached', taskId: message.taskId, sessionId: session?.claudeSessionId || null, bufferedOutput: buffered || '' }));
     } else {
         connection.socket.send(JSON.stringify({ type: 'output', taskId: message.taskId, data: '[System] No active session found.' }));
     }
 }
 
-async function handleStop(taskId: string) {
+async function handleStop(taskId: string, currentConnection?: SocketStream) {
+    console.log(`[Execution] Stopping task ${taskId}`);
     agentManager.stopTask(taskId);
+
+    // 1. Unconditionally patch database to idle so the UI reflects state accurately
+    const result = await findTask(taskId);
+    if (result) {
+        await patchTask(taskId, { status: 'idle' });
+        console.log(`[Execution] Task ${taskId} patched to idle in database`);
+    }
+
+    // 2. Handle active execution reference
     const laneExecution = runningLaneExecutions.get(taskId);
+    const connectionToNotify = currentConnection || laneExecution?.connection;
+
     if (laneExecution) {
         laneExecution.stopped = true;
-        const result = await findTask(taskId);
-        if (result) {
-            result.task.status = 'idle';
-            result.task.updatedAt = new Date().toISOString();
-            await writeProjectData(result.project.path, result.data);
-            const stopMessage: ConversationMessage = { id: uuid(), role: 'system', content: '[系统] 任务已被用户停止', type: 'info', timestamp: new Date().toISOString() };
-            await sendAndSaveMessage(laneExecution.connection, taskId, result.project.path, stopMessage);
-            if (laneExecution.connection.socket.readyState === 1) {
-                laneExecution.connection.socket.send(JSON.stringify({ type: 'task_status', taskId, status: 'idle', laneId: result.task.laneId }));
-            }
-        }
         setTimeout(() => runningLaneExecutions.delete(taskId), 1000);
+    }
+
+    // 3. Notify the UI
+    if (result && connectionToNotify) {
+        const stopMessage: ConversationMessage = {
+            id: uuid(),
+            role: 'system',
+            content: '[系统] 任务已被用户停止',
+            type: 'info',
+            timestamp: new Date().toISOString()
+        };
+        await sendAndSaveMessage(connectionToNotify, taskId, result.project.path, stopMessage);
+
+        if (connectionToNotify.socket.readyState === 1) {
+            connectionToNotify.socket.send(JSON.stringify({
+                type: 'task_status',
+                taskId,
+                status: 'idle',
+                laneId: result.task.laneId
+            }));
+        }
     }
 }
 

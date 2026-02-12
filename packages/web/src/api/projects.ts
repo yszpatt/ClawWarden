@@ -67,7 +67,7 @@ export async function fetchLaneConfigs(projectId: string): Promise<Record<string
 
 export async function createTask(
     projectId: string,
-    task: { title: string; description: string; prompt?: string; laneId: string }
+    task: { title: string; description: string; prompt?: string; laneId: string; autoExecute?: boolean }
 ): Promise<any> {
     const res = await fetch(`${API_BASE}/api/projects/${projectId}/tasks`, {
         method: 'POST',

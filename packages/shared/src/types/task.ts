@@ -1,4 +1,4 @@
-export type TaskStatus = 'idle' | 'running' | 'completed' | 'failed' | 'pending-dev' | 'pending-merge';
+export type TaskStatus = 'idle' | 'running' | 'completed' | 'failed' | 'pending-dev' | 'pending-merge' | 'awaiting-review';
 export type TaskCreator = 'user' | 'claude';
 
 export interface ExecutionLog {
@@ -89,6 +89,7 @@ export interface Task {
     planPath?: string;  // 计划方案文件路径
     structuredOutput?: StructuredOutput;  // 结构化输出
     metadata?: Record<string, unknown>;
+    autoExecute?: boolean;  // 是否自动执行：完成后自动移到下一泳道并启动
 }
 
 

@@ -189,6 +189,8 @@ export class AgentManager extends EventEmitter {
                             if (inputQueue.length === 0) {
                                 await new Promise<void>(resolve => { inputNotify = resolve; });
                             }
+                            // Check if closed while waiting
+                            if (inputQueue.length === 0) return { value: undefined as any, done: true };
                             const value = inputQueue.shift();
                             return { value: value!, done: false };
                         }
@@ -203,7 +205,7 @@ export class AgentManager extends EventEmitter {
                     name: 'antiwarden_update',
                     description: 'Update task status and lane.',
                     inputSchema: z.object({
-                        status: z.enum(['idle', 'running', 'completed', 'failed', 'pending-dev', 'pending-merge']),
+                        status: z.enum(['idle', 'running', 'completed', 'failed', 'pending-dev', 'pending-merge', 'awaiting-review']),
                         moveTo: z.enum(['plan', 'develop', 'test', 'pending-merge', 'archived']).optional(),
                         description: z.string().optional()
                     }),
@@ -308,8 +310,11 @@ export class AgentManager extends EventEmitter {
                     }
                 } catch (err) {
                     if (!taskSuccess) {
-                        await patchTask(taskId, { status: 'failed' });
-                        this.emit('error', { taskId, error: err });
+                        const session = this.sessions.get(taskId);
+                        if (!session?.completed) {
+                            await patchTask(taskId, { status: 'failed' });
+                            this.emit('error', { taskId, error: err });
+                        }
                     }
                 } finally {
                     const session = this.sessions.get(taskId);
@@ -351,7 +356,23 @@ export class AgentManager extends EventEmitter {
             let messageId = this.generateMessageId();
             const pendingToolCalls = new Map<string, ToolCall>();
 
-            for await (const message of query({ prompt: userMessage, options: queryOptions as any })) {
+            const queryInstance = query({ prompt: userMessage, options: queryOptions as any });
+            const session = this.sessions.get(taskId);
+            if (session) {
+                session.queryInstance = queryInstance;
+            } else {
+                this.sessions.set(taskId, {
+                    queryInstance,
+                    inputQueue: [],
+                    inputNotify: null,
+                    inputStream: null,
+                    claudeSessionId: resumeSessionId,
+                    outputBuffer: '',
+                    laneId: options?.laneId
+                });
+            }
+
+            for await (const message of queryInstance) {
                 if (message.session_id && !this.getSessionId(taskId)) {
                     this.setSessionId(taskId, message.session_id);
                     callbacks?.onSessionStart?.(message.session_id);
@@ -433,7 +454,18 @@ export class AgentManager extends EventEmitter {
     stopTask(taskId: string) {
         const session = this.sessions.get(taskId);
         if (session) {
-            session.queryInstance.close();
+            if (session.queryInstance && typeof session.queryInstance.close === 'function') {
+                try {
+                    session.queryInstance.close();
+                } catch (e) {
+                    console.error(`[AgentManager] Error closing query for ${taskId}:`, e);
+                }
+            }
+            if (session.inputNotify) {
+                const notify = session.inputNotify;
+                session.inputNotify = null;
+                notify(); // Wake up any hanging next() calls
+            }
             session.completed = true;
             this.emit('statusUpdate', { taskId, status: 'idle' });
         }

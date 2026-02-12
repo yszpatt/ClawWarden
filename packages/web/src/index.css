@@ -485,8 +485,24 @@ body {
 }
 
 .task-status.failed {
-  background: rgba(239, 68, 68, 0.2);
-  color: #EF4444;
+    background: rgba(239, 68, 68, 0.2);
+    color: #EF4444;
+}
+
+.task-status.awaiting-review {
+    background: rgba(245, 158, 11, 0.2);
+    color: #F59E0B;
+}
+
+.task-auto-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: rgba(245, 158, 11, 0.15);
+    color: #F59E0B;
 }
 
 .task-creator {

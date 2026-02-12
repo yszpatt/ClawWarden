@@ -15,7 +15,7 @@ export async function taskRoutes(fastify: FastifyInstance) {
     // Create task
     fastify.post<{
         Params: { projectId: string };
-        Body: { title: string; description: string; prompt?: string; laneId: string };
+        Body: { title: string; description: string; prompt?: string; laneId: string; autoExecute?: boolean };
     }>('/api/projects/:projectId/tasks', async (request) => {
         const config = await readGlobalConfig();
         const project = config.projects.find(p => p.id === request.params.projectId);
@@ -36,6 +36,7 @@ export async function taskRoutes(fastify: FastifyInstance) {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             createdBy: 'user',
+            autoExecute: request.body.autoExecute || false,
         };
 
         // Create worktree immediately for the task

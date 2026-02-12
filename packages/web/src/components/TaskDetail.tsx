@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import type { Task, StructuredOutput } from '@clawwarden/shared';
-import { Square, Save, X, Trash2, GitMerge, Palette, Edit2, Info, Database, GitBranch, Code2, ShieldCheck, Play, Package } from 'lucide-react';
+import { Square, Save, X, Trash2, GitMerge, Palette, Edit2, Info, Database, GitBranch, Code2, ShieldCheck, Play, Package, Check, RotateCcw, Zap } from 'lucide-react';
 import { useTerminalConnection } from './Terminal';
 import { ConversationPanel } from './conversation/ConversationPanel';
 import { useAppStore } from '../stores/appStore';
@@ -287,10 +287,47 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                     <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>核心操作</span>
                         <span className={`task-status ${task.status} status-badge-glow`}>
-                            {task.status === 'idle' ? '闲置' : task.status === 'running' ? '运行中' : task.status === 'completed' ? '已完成' : '已结束'}
+                            {task.status === 'idle' ? '闲置' : task.status === 'running' ? '运行中' : task.status === 'completed' ? '已完成' : task.status === 'awaiting-review' ? '待检查' : '已结束'}
                         </span>
+                        {task.autoExecute && (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.625rem', color: '#F59E0B', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                                <Zap size={10} fill="#F59E0B" /> 自动
+                            </span>
+                        )}
                     </div>
-                    {renderMainActionButton()}
+                    {task.status === 'awaiting-review' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                            <div style={{ padding: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '8px', fontSize: '0.8125rem', color: '#F59E0B' }}>
+                                ✨ 任务已完成，请检查结果并确认下一步操作
+                            </div>
+                            <button
+                                className="btn-unified primary"
+                                style={{ width: '100%', padding: '0.75rem' }}
+                                onClick={async () => {
+                                    if (!currentLaneConfig?.onCompleteLane) return;
+                                    await updateTask(task.id, {
+                                        status: 'idle',
+                                        laneId: currentLaneConfig.onCompleteLane
+                                    });
+                                }}
+                            >
+                                <Check size={16} />
+                                确认并移动到下一泳道
+                            </button>
+                            <button
+                                className="btn-unified secondary"
+                                style={{ width: '100%', padding: '0.75rem' }}
+                                onClick={async () => {
+                                    await updateTask(task.id, { status: 'idle' });
+                                }}
+                            >
+                                <RotateCcw size={16} />
+                                标记为空闲
+                            </button>
+                        </div>
+                    ) : (
+                        renderMainActionButton()
+                    )}
                 </div>
 
                 {/* Task Information Group */}

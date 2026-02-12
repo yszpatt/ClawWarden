@@ -86,7 +86,7 @@ function App() {
     (window as any).targetLaneId = laneId;
   };
 
-  const handleCreateTask = async (taskData: { title: string; description: string; prompt: string }) => {
+  const handleCreateTask = async (taskData: { title: string; description: string; prompt: string; autoExecute?: boolean }) => {
     if (!currentProject) return;
 
     // Get the target laneId (default to 'plan' if not set)

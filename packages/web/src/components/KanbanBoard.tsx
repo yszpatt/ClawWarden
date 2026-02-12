@@ -1,4 +1,5 @@
 import type { Task, Lane } from '@clawwarden/shared';
+import { Zap } from 'lucide-react';
 
 interface TaskCardProps {
     task: Task;
@@ -16,6 +17,7 @@ export function TaskCard({ task, selected, laneColor, onClick }: TaskCardProps) 
         'failed': '失败',
         'pending-dev': '待开发',
         'pending-merge': '待合并',
+        'awaiting-review': '待检查',
     };
 
     const statusLabel = statusLabels[task.status] || task.status;
@@ -38,6 +40,11 @@ export function TaskCard({ task, selected, laneColor, onClick }: TaskCardProps) 
             )}
             <div className="task-meta">
                 <span className={`task-status ${task.status}`}>{statusLabel}</span>
+                {task.autoExecute && (
+                    <span className="task-auto-badge" title="自动执行模式">
+                        <Zap size={10} fill="#F59E0B" />
+                    </span>
+                )}
                 <span className={`task-creator ${task.createdBy}`}>
                     {task.createdBy === 'claude' ? '🤖 Claude' : '👤 You'}
                 </span>
