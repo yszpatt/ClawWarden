@@ -43,11 +43,8 @@ export function useTerminalConnection(
                 }
             } else if (message.type === 'conversation.plan_complete') {
                 console.log('[TaskConnection] Plan complete:', message.planPath);
-                if (callbacksRef.current?.onPlanComplete && message.content) {
-                    callbacksRef.current.onPlanComplete(message.content, message.planPath);
-                }
-                if (callbacksRef.current?.onStatusChange) {
-                    callbacksRef.current.onStatusChange('pending-dev');
+                if (callbacksRef.current?.onPlanComplete) {
+                    callbacksRef.current.onPlanComplete(message.content || '', message.planPath);
                 }
             } else if (message.type === 'structured-output') {
                 console.log('[TaskConnection] Structured output received');

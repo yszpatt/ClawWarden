@@ -45,16 +45,28 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         stop,
         disconnect,
     } = useTerminalConnection(projectId, task.id, {
-        onPlanComplete: (content) => {
+        onPlanComplete: (content, _planPath) => {
             // Ignore if task has changed
             if (currentTaskIdRef.current !== task.id) return;
+            console.log('[TaskDetail] Plan complete received via WebSocket');
             setPlanContent(content);
             setEditedPlanContent(content);
+            // Refresh task data to get updated planPath and other metadata
+            fetchTask(projectId, task.id).then(res => {
+                if (res.task) setFetchedTask(res.task);
+            });
         },
         onStatusChange: (status) => {
             // Ignore if task has changed
             if (currentTaskIdRef.current !== task.id) return;
             onStatusChange?.(status as Task['status']);
+
+            // If task finished running, refresh data to pick up backend changes (like lane transitions)
+            if (status !== 'running') {
+                fetchTask(projectId, task.id).then(res => {
+                    if (res.task) setFetchedTask(res.task);
+                });
+            }
         },
         onStructuredOutput: (output) => {
             // Ignore if task has changed
