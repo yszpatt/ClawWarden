@@ -244,7 +244,7 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
             {/* Right Column: Task Info & Actions */}
             <div className="task-detail-main">
                 {/* Header Actions */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div className="detail-header">
                     <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>任务详情</h2>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                         {!isEditing ? (
@@ -283,26 +283,28 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                 </div>
 
                 {/* Primary Action Section */}
-                <div style={{ background: 'rgba(255,255,255,0.03)', padding: '1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)', marginBottom: '2rem' }}>
-                    <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>核心操作</span>
-                        <span className={`task-status ${task.status} status-badge-glow`}>
-                            {task.status === 'idle' ? '闲置' : task.status === 'running' ? '运行中' : task.status === 'completed' ? '已完成' : task.status === 'awaiting-review' ? '待检查' : '已结束'}
-                        </span>
-                        {task.autoExecute && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.625rem', color: '#F59E0B', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
-                                <Zap size={10} fill="#F59E0B" /> 自动
+                <div className="info-card">
+                    <div style={{ marginBottom: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span className="detail-section-title" style={{ marginBottom: 0 }}>核心操作</span>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <span className={`task-status ${task.status} status-badge-glow`}>
+                                {task.status === 'idle' ? '待命' : task.status === 'running' ? '执行中' : task.status === 'completed' ? '已完成' : task.status === 'awaiting-review' ? '需检查' : '结束'}
                             </span>
-                        )}
+                            {task.autoExecute && (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.625rem', color: '#F59E0B', background: 'rgba(245, 158, 11, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                                    <Zap size={10} fill="#F59E0B" /> 自动
+                                </span>
+                            )}
+                        </div>
                     </div>
                     {task.status === 'awaiting-review' ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                            <div style={{ padding: '0.75rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '8px', fontSize: '0.8125rem', color: '#F59E0B' }}>
-                                ✨ 任务已完成，请检查结果并确认下一步操作
+                            <div style={{ padding: '0.875rem', background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.2)', borderRadius: '8px', fontSize: '0.8125rem', color: '#F59E0B', lineHeight: 1.5 }}>
+                                ✨ 任务执行已告一段落，请检查结果并决定后续操作。
                             </div>
                             <button
                                 className="btn-unified primary"
-                                style={{ width: '100%', padding: '0.75rem' }}
+                                style={{ width: '100%', padding: '0.875rem' }}
                                 onClick={async () => {
                                     if (!currentLaneConfig?.onCompleteLane) return;
                                     await updateTask(task.id, {
@@ -312,27 +314,29 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                                 }}
                             >
                                 <Check size={16} />
-                                确认并移动到下一泳道
+                                确认并进入下一阶段
                             </button>
                             <button
                                 className="btn-unified secondary"
-                                style={{ width: '100%', padding: '0.75rem' }}
+                                style={{ width: '100%', padding: '0.875rem' }}
                                 onClick={async () => {
                                     await updateTask(task.id, { status: 'idle' });
                                 }}
                             >
                                 <RotateCcw size={16} />
-                                标记为空闲
+                                重置为待命状态
                             </button>
                         </div>
                     ) : (
-                        renderMainActionButton()
+                        <div style={{ marginTop: '0.5rem' }}>
+                            {renderMainActionButton()}
+                        </div>
                     )}
                 </div>
 
                 {/* Task Information Group */}
-                <div className="info-group" style={{ marginBottom: '2rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--accent)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                <div style={{ marginBottom: '2.5rem' }}>
+                    <div className="detail-section-title">
                         <Info size={14} />
                         基本信息
                     </div>
@@ -342,12 +346,12 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                         {isEditing ? (
                             <input className="form-input" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} />
                         ) : (
-                            <div style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-primary)' }}>{task.title}</div>
+                            <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>{task.title}</div>
                         )}
                     </div>
 
-                    <div className="form-group" style={{ marginTop: '1rem' }}>
-                        <label className="form-label">描述</label>
+                    <div className="form-group" style={{ marginTop: '1.25rem' }}>
+                        <label className="form-label">任务描述</label>
                         {isEditing ? (
                             <textarea className="form-textarea" value={editForm.description} onChange={e => setEditForm({ ...editForm, description: e.target.value })} />
                         ) : (
@@ -357,32 +361,32 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                 </div>
 
                 {/* Technical Context Group */}
-                <div className="info-group" style={{ marginBottom: '2rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--accent)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                <div style={{ marginBottom: '2.5rem' }}>
+                    <div className="detail-section-title">
                         <Database size={14} />
                         技术上下文
                     </div>
 
                     {(task.prompt || isEditing) && (
                         <div className="form-group">
-                            <label className="form-label">执行 Prompt</label>
+                            <label className="form-label">任务 Prompt</label>
                             {isEditing ? (
-                                <textarea className="form-textarea" style={{ fontFamily: 'monospace', minHeight: '100px' }} value={editForm.prompt} onChange={e => setEditForm({ ...editForm, prompt: e.target.value })} />
+                                <textarea className="form-textarea" style={{ fontFamily: 'var(--font-mono)', minHeight: '120px' }} value={editForm.prompt} onChange={e => setEditForm({ ...editForm, prompt: e.target.value })} />
                             ) : (
-                                <div style={{ background: 'var(--bg-tertiary)', padding: '1rem', borderRadius: '8px', fontFamily: 'monospace', fontSize: '0.75rem', color: 'var(--neon-cyan)', whiteSpace: 'pre-wrap' }}>{task.prompt}</div>
+                                <div className="code-block-premium">{task.prompt}</div>
                             )}
                         </div>
                     )}
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1.25rem' }}>
                         <div>
                             <label className="form-label">任务 ID</label>
-                            <div style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: 'var(--text-muted)' }}>{task.id}</div>
+                            <div style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{task.id}</div>
                         </div>
                         <div>
-                            <label className="form-label">创建者</label>
+                            <label className="form-label">创建来源</label>
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: task.createdBy === 'claude' ? 'var(--accent)' : 'var(--text-primary)' }}>
-                                {task.createdBy === 'claude' ? '🤖 CLAUDE' : '👤 USER'}
+                                {task.createdBy === 'claude' ? '🤖 CLAUDE AGENT' : '👤 USER'}
                             </span>
                         </div>
                     </div>
@@ -390,23 +394,32 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
 
                 {/* Git & Session Context */}
                 {(task.worktree || task.claudeSession) && (
-                    <div className="info-group">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--accent)', fontSize: '0.8125rem', fontWeight: 600 }}>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <div className="detail-section-title">
                             <GitBranch size={14} />
-                            环境状态
+                            工作环境
                         </div>
 
                         {task.worktree && (
-                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '0.75rem' }}>
-                                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--neon-amber)', marginBottom: '0.25rem' }}>Branch: {task.worktree.branch}</div>
-                                <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)' }}>Created: {new Date(task.worktree.createdAt).toLocaleString()}</div>
+                            <div className="env-status-item">
+                                <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--neon-amber)', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <GitBranch size={12} />
+                                    {task.worktree.branch}
+                                </div>
+                                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                                    创建于: {new Date(task.worktree.createdAt).toLocaleString()}
+                                </div>
                             </div>
                         )}
 
                         {task.claudeSession && (
-                            <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden' }}>Session ID: {task.claudeSession.id}</div>
-                                <div style={{ fontSize: '0.625rem', color: 'var(--text-muted)', marginTop: '0.25rem' }}>Attached: {new Date(task.claudeSession.createdAt).toLocaleString()}</div>
+                            <div className="env-status-item">
+                                <div style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', marginBottom: '0.375rem' }}>
+                                    Session: {task.claudeSession.id}
+                                </div>
+                                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                                    关联时间: {new Date(task.claudeSession.createdAt).toLocaleString()}
+                                </div>
                             </div>
                         )}
                     </div>

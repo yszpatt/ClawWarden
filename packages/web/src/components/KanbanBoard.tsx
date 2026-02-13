@@ -28,10 +28,6 @@ export function TaskCard({ task, selected, laneColor, onClick }: TaskCardProps) 
             onClick={onClick}
             style={{
                 '--lane-color': laneColor,
-                ...(selected && laneColor ? {
-                    borderColor: laneColor,
-                    boxShadow: `0 0 0 1px ${laneColor}, var(--card-shadow-hover)`
-                } : {})
             } as React.CSSProperties}
         >
             <div className="task-title">{task.title}</div>

@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Settings, ArrowLeft, X } from 'lucide-react';
 import { Logo } from './Logo';
 
 interface HeaderProps {
@@ -17,22 +18,22 @@ export function Header({ projectName, onBackToProjects, onSettingsClick }: Heade
                         onClick={onBackToProjects}
                         title="返回项目列表"
                     >
-                        ←
+                        <ArrowLeft size={18} />
                     </button>
                 )}
                 <div className="header-brand">
-                    <Logo size={32} />
+                    <Logo size={28} />
                     <h1>ClawWarden</h1>
                 </div>
             </div>
             <div className="header-actions">
                 {projectName && (
                     <span className="project-badge">
-                        📁 {projectName}
+                        {projectName}
                     </span>
                 )}
                 <button className="settings-btn" onClick={onSettingsClick}>
-                    ⚙️
+                    <Settings size={18} />
                 </button>
             </div>
         </header>
@@ -51,7 +52,9 @@ export function Sidebar({ children, title = '详情', onClose, wide }: SidebarPr
         <aside className={`app-sidebar ${wide ? 'wide' : ''}`}>
             <div className="sidebar-header">
                 <h2>{title}</h2>
-                <button className="sidebar-close" onClick={onClose}>×</button>
+                <button className="sidebar-close" onClick={onClose}>
+                    <X size={20} />
+                </button>
             </div>
             <div className="sidebar-content">
                 {children}
