@@ -53,69 +53,50 @@ export function TaskForm({ onSubmit, onClose }: TaskFormProps) {
                         placeholder="Claude 执行此任务时使用的 prompt..."
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
-                        style={{ minHeight: '150px', fontFamily: 'monospace' }}
+                        style={{ minHeight: '120px', fontFamily: 'var(--font-mono)' }}
                     />
                 </div>
 
                 <div className="form-group">
-                    <label
-                        className="auto-execute-toggle"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.75rem',
-                            padding: '0.75rem 1rem',
-                            background: autoExecute ? 'rgba(245, 158, 11, 0.1)' : 'var(--bg-tertiary)',
-                            border: `1px solid ${autoExecute ? 'rgba(245, 158, 11, 0.3)' : 'var(--border-color)'}`,
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                        }}
+                    <div
+                        className={`auto-execute-toggle-premium ${autoExecute ? 'active' : ''}`}
+                        onClick={() => setAutoExecute(!autoExecute)}
                     >
+                        <div className="toggle-icon">
+                            <Zap size={16} fill={autoExecute ? 'currentColor' : 'none'} />
+                        </div>
+                        <div className="toggle-info">
+                            <div className="toggle-title">
+                                自动执行模式
+                            </div>
+                            <div className="toggle-desc">
+                                任务完成后自动进入下一阶段
+                            </div>
+                        </div>
                         <input
                             type="checkbox"
                             checked={autoExecute}
                             onChange={(e) => setAutoExecute(e.target.checked)}
                             style={{ display: 'none' }}
                         />
-                        <span style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: '32px',
-                            height: '32px',
-                            borderRadius: '8px',
-                            background: autoExecute ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255,255,255,0.05)',
-                            color: autoExecute ? '#F59E0B' : 'var(--text-muted)',
-                            transition: 'all 0.2s ease',
-                        }}>
-                            <Zap size={16} fill={autoExecute ? '#F59E0B' : 'none'} />
-                        </span>
-                        <div style={{ flex: 1 }}>
-                            <div style={{
-                                fontSize: '0.875rem',
-                                fontWeight: 600,
-                                color: autoExecute ? '#F59E0B' : 'var(--text-primary)',
-                            }}>
-                                自动执行模式
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                任务完成后自动进入下一泳道并启动，到「待合并」停止
-                            </div>
-                        </div>
-                    </label>
+                    </div>
                 </div>
 
                 <div className="modal-actions">
-                    <button className="cancel-btn" onClick={onClose}>
+                    <button className="btn-unified secondary" onClick={onClose}>
                         取消
                     </button>
                     <button
-                        className="primary-btn"
+                        className="btn-unified primary"
                         onClick={handleSubmit}
                         disabled={submitting || !title.trim()}
                     >
-                        {submitting ? '创建中...' : '创建任务'}
+                        {submitting ? '创建中...' : (
+                            <>
+                                <Zap size={14} fill="currentColor" />
+                                创建任务
+                            </>
+                        )}
                     </button>
                 </div>
             </div>

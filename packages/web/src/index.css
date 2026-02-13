@@ -13,14 +13,20 @@
   --header-text: #f8fafc;
   --header-border: rgba(255, 255, 255, 0.08);
 
-  /* 背景变量 - 包含渐变定义 */
-  --bg-gradient: radial-gradient(circle at 50% 0%, #1e293b 0%, transparent 40%),
-    radial-gradient(circle at 100% 0%, #172554 0%, transparent 30%);
+  /* 背景变量 - 更加深邃的动态感 */
+  --bg-gradient: radial-gradient(circle at 20% 0%, rgba(30, 41, 59, 0.6) 0%, transparent 40%),
+    radial-gradient(circle at 80% 0%, rgba(23, 37, 84, 0.6) 0%, transparent 40%),
+    radial-gradient(circle at 50% 100%, rgba(15, 23, 42, 1) 0%, #020617 100%);
 
-  /* 玻璃拟态增强 */
-  --glass-bg: rgba(15, 23, 42, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-blur: 12px;
+  /* 网格覆盖层 */
+  --bg-grid: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+
+  /* 玻璃拟态增强 - 更加通透 */
+  --glass-bg: rgba(30, 41, 59, 0.4);
+  --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-blur: 16px;
+  --glass-inner-light: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, transparent 100%);
 
   /* 文字颜色 */
   --text-primary: #f8fafc;
@@ -106,8 +112,9 @@
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: var(--bg-primary);
-  background-image: var(--bg-gradient);
+  background-color: #020617;
+  background-image: url('/noise.svg'), var(--bg-grid), var(--bg-gradient);
+  background-size: auto, 30px 30px, 100% 100%;
   background-attachment: fixed;
   color: var(--text-primary);
   line-height: 1.6;
@@ -257,22 +264,32 @@ body {
 .main-content {
   flex: 1;
   overflow-x: auto;
-  padding: 1rem;
+  padding: 1.5rem;
 }
 
 /* Sidebar */
 .app-sidebar {
-  width: 400px;
+  width: 450px;
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  border-left: 1px solid var(--border-color);
+  border-left: 1px solid var(--glass-border);
 
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  transition: width 0.3s ease;
-  box-shadow: -5px 0 25px rgba(0, 0, 0, 0.05);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.2);
+  position: relative;
+  z-index: 40;
+}
+
+.app-sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--glass-inner-light);
+  pointer-events: none;
 }
 
 .app-sidebar.wide {
@@ -319,23 +336,10 @@ body {
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
-  padding: 1rem;
+  padding: 1.25rem;
 }
 
-/* Kanban Board */
-/* Kanban Board styles are defined in the main section below */
-
-.kanban-lane {
-  width: 280px;
-  background: var(--bg-secondary);
-  /* 纯净的卡片背景 */
-  border-radius: var(--bento-radius);
-  display: flex;
-  flex-direction: column;
-  max-height: 100%;
-  box-shadow: var(--card-shadow);
-  border: 1px solid var(--border-color);
-}
+/* Kanban Board Section */
 
 .lane-header {
   padding: 0.75rem 1rem;
@@ -360,25 +364,25 @@ body {
 }
 
 .lane-add-small {
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
   color: var(--text-secondary);
   cursor: pointer;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
-  opacity: 0.7;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .lane-add-small:hover {
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-  opacity: 1;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
   transform: scale(1.1);
+  box-shadow: 0 0 15px var(--accent-glow);
 }
 
 .lane-add-small:active {
@@ -536,19 +540,24 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.5rem;
-  background: transparent;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
   border: 1px dashed var(--border-color);
-  border-radius: 6px;
-  color: var(--text-secondary);
+  border-radius: 8px;
+  color: var(--text-muted);
   font-size: 0.875rem;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  width: 100%;
+  margin-top: 0.5rem;
 }
 
 .add-task-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--text-primary);
+  transform: translateY(-1px);
 }
 
 /* Empty state */
@@ -910,58 +919,146 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(2, 6, 23, 0.85);
+  /* 深色遮罩 */
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-content {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--bento-radius);
   padding: 2rem;
-  width: 100%;
-  max-width: 400px;
-  outline: none;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: var(--shadow-lg), 0 0 40px rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden;
+  animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modal-content::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--glass-inner-light);
+  pointer-events: none;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .modal-content h2 {
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .modal-actions {
   display: flex;
-  gap: 0.75rem;
-  margin-top: 1.5rem;
+  gap: 1rem;
+  margin-top: 2.5rem;
+  justify-content: flex-end;
 }
 
-.cancel-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  border-radius: 24px;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--border-color);
-  line-height: 1.2;
-  background: var(--bg-tertiary);
-  color: var(--text-primary);
-}
-
-.cancel-btn:hover {
-  background: var(--bg-secondary);
-  border-color: var(--text-secondary);
-  transform: translateY(-1px);
+/* Modal Actions Adjustments */
+.modal-actions .btn-unified {
+  min-width: 100px;
 }
 
 .modal-actions .btn-unified.primary {
+  flex: 0 0 auto;
+}
+
+/* Premium Toggle */
+.auto-execute-toggle-premium {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.auto-execute-toggle-premium:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--text-muted);
+}
+
+.auto-execute-toggle-premium.active {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+}
+
+.active .toggle-icon {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.toggle-info {
   flex: 1;
+}
+
+.toggle-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.active .toggle-title {
+  color: #fbbf24;
+}
+
+.toggle-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
 .primary-btn:disabled,
@@ -1575,34 +1672,39 @@ body {
 }
 
 .kanban-lane {
-  flex: 0 0 280px;
-  /* Fixed width, no shrinking */
-  width: 280px;
+  flex: 0 0 320px;
+  width: 320px;
   max-height: 100%;
-
-  max-width: 320px;
-  /* But don't become too wide on huge screens */
-  background: transparent;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--bento-radius);
   display: flex;
   flex-direction: column;
   height: 100%;
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+.kanban-lane::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--glass-inner-light);
+  pointer-events: none;
+  z-index: 0;
 }
 
 .lane-header {
-  padding: 0.5rem 0.75rem;
+  padding: 1rem 1.25rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.lane-indicator {
-  width: 100%;
-  height: 4px;
-  border-radius: 2px;
-  margin-bottom: 4px;
-  display: none;
-  /* We'll use title color or icons */
+  gap: 0.75rem;
+  position: relative;
+  z-index: 1;
+  border-bottom: 1px solid var(--glass-border);
 }
 
 .lane-title {
@@ -1623,10 +1725,25 @@ body {
 .lane-content {
   flex: 1;
   overflow-y: auto;
-  padding: 0.25rem;
+  padding: 0.75rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
+  position: relative;
+  z-index: 1;
+
+  /* Custom Scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--glass-border) transparent;
+}
+
+.lane-content::-webkit-scrollbar {
+  width: 4px;
+}
+
+.lane-content::-webkit-scrollbar-thumb {
+  background-color: var(--glass-border);
+  border-radius: 10px;
 }
 
 /* End of Theme Styles */

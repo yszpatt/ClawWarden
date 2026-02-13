@@ -171,6 +171,10 @@ export function KanbanLane({ lane, tasks, selectedTaskId, onTaskClick, onAddTask
                         />
                     ))}
                 </SortableContext>
+                <button className="add-task-btn" onClick={() => onAddTask?.(lane.id)}>
+                    <Plus size={16} />
+                    添加任务
+                </button>
             </div>
         </div>
     );
