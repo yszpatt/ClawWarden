@@ -13,8 +13,10 @@ ClawWarden is a sophisticated Kanban-style task management dashboard designed to
 - **📝 Incremental Summaries**: Hierarchical, accordion-style task progression logs with Markdown support.
 - **🗣️ Conversational Interaction**: Native chat interface for direct instruction and feedback during task execution.
 - **🛠️ Worktree Management**: Automated `git worktree` isolation for concurrent task execution.
+- **🤖 AI-Assisted Merge**: Automated Git branch merging and conflict resolution powered by Claude Agents.
 - **🔄 Lane-Specific Logic**: Synchronized themes, icons, and specialized actions for each development lane.
 - **🎨 Modern UI**: Sleek React-based interface with dark mode, deep glassmorphism, and drag-and-drop support.
+- **📜 [Changelog](CHANGELOG.md)**: Explore the latest updates and project milestones.
 
 ---
 

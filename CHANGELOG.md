@@ -1,0 +1,90 @@
+# CHANGELOG
+
+This document records the major milestones and technical updates of the ClawWarden project.
+
+---
+
+## [2026-02-13] - Markdown Enhancement & Stability
+
+### 🎨 Markdown Renderer Optimization
+- **Visual Refinement**: Significantly improved the visual presentation of Markdown elements in the Task Detail view, including better heading hierarchy, code block styling, table layouts, and list spacing.
+- **Style Isolation**: Introduced a dedicated `MarkdownRenderer.css` module for decoupled and maintainable styling logic.
+
+### 🐞 Bug Fixes & Stability
+- **Stop Button Reliability**: Fixed a bug where the "Stop Execution" button would become unresponsive after a page refresh.
+- **State Consistency**: Improved the UI state transition logic after task execution stops or completes, ensuring buttons and status indicators accurately reflect the backend state.
+
+---
+
+## [2026-02-12] - Workflow Automation & Summary System Enhancement
+
+### 🚀 Workflow Automation
+- **Full Lane Auto-Transition**: Fixed a limitation where auto-transition logic only worked for the "Plan" lane. Now, lanes like "Develop" and "Test" can automatically move tasks to the next stage if `onCompleteLane` is configured.
+- **Task State Consistency**: Guaranteed that task status reliably reverts from `running` to `idle` after automated actions (moving lanes, saving files) are completed, preventing UI freezes.
+
+### 📊 Structured Summary System
+- **Plan Fallback Mode**: Addressed issues where the Agent SDK might return structured JSON but omit Markdown text. Introduced a "Reconstruction Mode" that assembles a Markdown plan from JSON fields (summary, technical plan, component design).
+- **Summary Dashboard Evolution**:
+    - **Multi-dimensional Display**: The summary view now presents both a high-level `summary` and detailed `details` for higher information density.
+    - **Development Details**: Added explicit rendering for "New Tests", "Breaking Changes", and "Next Steps" in development summaries.
+    - **Test Report Enhancement**: Integrated specific displays for code coverage (lines, functions, branches).
+- **Real-time Feedback**: Added "Automatic Summary Generated" system notifications and implemented precise real-time refreshing for the summary tab.
+
+### 🛠️ System Robustness
+- **Concurrent Write Protection**: Introduced an "Immediate Read-Modify-Write" mechanism in `execution.ts` to prevent data loss in `tasks.json` during rapid lane transitions.
+- **Panel Reset**: Fixed a UI bug where plan or summary data from a previous task would persist when switching to a new task card.
+
+### 🤖 AI-Assisted Merge & Environment Isolation
+- **AI Merge Protocol**: Refactored the "To Merge" lane logic. A Claude Agent now acts as a Release Engineer, verifying changes, executing Git merges, and autonomously fixing conflicts.
+- **Automated Environment Isolation**:
+    - **Isolation Hardening**: The system now automatically writes a `.gitignore` to the root of new Worktrees to exclude the `.claude/` directory, preventing configuration leakage.
+    - **Lifecycle Management**: Agents can now automatically clean up temporary worktrees and task branches after successful merging based on prompt instructions.
+
+### 🐞 Bug Fixes
+- **Summary Completion**: Fixed issues where "Develop" and "Test" lanes failed to generate summaries. Implemented a text-based fallback mechanism.
+- **Stop Reliability**: Resolved null-pointer crashes when clicking "Stop" and fixed WebSocket reconnection logic for controlling running tasks after a refresh.
+
+---
+
+## [2026-02-10] - Lane Experience & Tool Permissions
+
+### 🔧 Tool Permissions
+- **Full Tool Access**: Removed read-only restrictions from the "Plan" lane. All lanes now have full tool permissions (`Bash`, `Read`, `Edit`, `Glob`, `Grep`, `Find`, `Write`).
+
+### 🐞 Bug Fixes
+- **State Synchronization**: Fixed incorrect button states when switching task cards by using `task.status` as the single source of truth.
+- **Conversation Refresh**: Ensured the `useConversation` hook clears old messages when the `taskId` changes.
+- **Runtime Disabling**: Correctly disabled edit and delete buttons while a task is running.
+- **Task Creation**: Fixed a bug where tasks were always created in the "Plan" lane regardless of where the creation button was clicked.
+
+---
+
+## [2026-02-04] - Core Interaction Model Refactoring & UI/UX Leap
+
+### ✨ Core Refactoring
+- **Incremental Structured Summaries**: Overhauled summary persistence. Instead of overwriting, the system now maintains an incremental sequence of summaries in the `.clawwarden` directory.
+- **Conversational Interaction**: Shifted from a terminal-centric model to a Chat/Conversation-first approach.
+- **Streaming Responses**: Deep integration with Claude Agent SDK for millisecond-level streaming message推送.
+
+### 💄 UI/UX Improvements
+- **Design Language**: Established a "High-tech, Professional, Cool-tone" aesthetic with glassmorphism and smooth transitions.
+- **Lane Synchronization**: Semantic mapping of icons, colors, and actions for each lane (Plan: Purple, Develop: Indigo, Test: Cyan, Merge: Gray).
+
+---
+
+## [2026-02-03] - Flexibility & Project Management
+- **Dynamic Project Import**: Added `FolderPicker` to allow importing projects from anywhere in the filesystem.
+- **Project Persistence**: Refactored `global.json` storage to support real-time editing and remote deletion.
+
+---
+
+## [2026-02-02] - Branding & Architecture
+- **Branding**: Officially renamed to **ClawWarden** (Claw for Claude Code, Warden for monitoring).
+- **Worktree Isolation**: Established independent Git Worktrees for each task to prevent file locks and environment pollution during concurrent execution.
+
+---
+
+## [2026-01-30 to 2026-02-01] - Early Development
+- **WebSocket Layer**: Built the full-duplex communication system.
+- **看板 (Kanban)**: Implemented drag-and-drop interaction using `@dnd-kit`.
+- **SDK Integration**: Initial handshake and session persistence with Anthropic Claude Agent SDK.

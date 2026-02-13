@@ -444,28 +444,34 @@ async function handleLaneAction(
             let finalPlanPath = task.planPath;
             const currentLaneId = laneId; // The lane we just finished executing
 
-            // Summary Fallback: If agent didn't provide structured output, generate one from text
+            // Summary Fallback: Attempt to capture the conclusion rather than the beginning
             if (!taskSdkStructuredOutput && fullTextAccumulator.trim().length > 10) {
                 console.log(`[Execution] Falling back to generic summary for task ${taskId}`);
-                const fallbackOutput = {
-                    summary: fullTextAccumulator.split('\n').find(l => l.trim().length > 5)?.substring(0, 100) || '任务执行总结',
-                    details: fullTextAccumulator.substring(0, 3000),
+                const lines = fullTextAccumulator.trim().split('\n').filter(l => l.trim().length > 0);
+                // Take the last 3 lines as a potential summary if it's short, or a heuristic for the end
+                const lastFewLines = lines.slice(-3).join('\n');
+                const firstMeaningfulLine = lines.find(l => l.length > 10 && !l.startsWith('#')) || lines[0];
+
+                taskSdkStructuredOutput = {
+                    summary: lastFewLines.length > 10 ? lastFewLines.substring(0, 150) : firstMeaningfulLine.substring(0, 150),
+                    details: fullTextAccumulator.substring(Math.max(0, fullTextAccumulator.length - 2000)),
                     result: 'success'
                 };
 
-                // Manually trigger the event so global/local listeners handle saving and broadcasting
+                // Trigger global listener for disk saving
                 agentManager.emit('structuredOutput', {
                     taskId,
-                    output: fallbackOutput,
+                    output: taskSdkStructuredOutput,
                     laneId: currentLaneId
                 });
             }
 
-            if (laneConfig.generatesPlan) {
-                const hasCompleteMarker = /<!--\s*PLAN_COMPLETE\s*-->|\[PLAN_COMPLETE\]|计划完成|设计完成|方案完成|方案已生成/i.test(fullTextAccumulator);
-                const hasStructuredOutput = taskSdkStructuredOutput && typeof taskSdkStructuredOutput === 'object';
+            const hasCompleteMarker = /<!--\s*PLAN_COMPLETE\s*-->|\[PLAN_COMPLETE\]|计划完成|设计完成|方案完成|方案已生成|执行完成|测试完成|DONE|COMPLETED/i.test(fullTextAccumulator);
+            const hasStructuredOutput = taskSdkStructuredOutput && typeof taskSdkStructuredOutput === 'object';
+            const isFinishedSuccessfully = hasCompleteMarker || hasStructuredOutput;
 
-                if (hasCompleteMarker || hasStructuredOutput) {
+            if (laneConfig.generatesPlan) {
+                if (isFinishedSuccessfully) {
                     const plansDir = path.join(project.path, '.clawwarden', 'plans');
                     await fs.mkdir(plansDir, { recursive: true });
                     const planFileName = `${task.id}-plan.md`;
@@ -506,25 +512,25 @@ async function handleLaneAction(
                         console.log(`[AutoExec] Plan complete, auto-moving to: ${finalLaneId}`);
                         scheduleNextLaneExecution(connection, taskId, projectPath, finalLaneId);
                     } else if (laneConfig.onCompleteLane) {
-                        // Manual mode: stay in current lane, mark awaiting-review
-                        // Summary is saved independently via global structuredOutput listener
                         finalStatus = 'awaiting-review';
                         console.log(`[Execution] Plan complete (manual mode), awaiting review`);
                     }
                 }
             } else if (laneConfig.onCompleteLane) {
-                if (task.autoExecute) {
-                    finalLaneId = laneConfig.onCompleteLane;
-                    console.log(`[AutoExec] Action complete, auto-moving to: ${finalLaneId}`);
-                    // Don't auto-execute in pending-merge — it's the stopping point
-                    if (finalLaneId !== 'pending-merge') {
-                        scheduleNextLaneExecution(connection, taskId, projectPath, finalLaneId);
+                // For non-plan lanes, only move forward if we actually have a result/marker
+                if (isFinishedSuccessfully) {
+                    if (task.autoExecute) {
+                        finalLaneId = laneConfig.onCompleteLane;
+                        console.log(`[AutoExec] Action complete, auto-moving to: ${finalLaneId}`);
+                        if (finalLaneId !== 'pending-merge') {
+                            scheduleNextLaneExecution(connection, taskId, projectPath, finalLaneId);
+                        }
+                    } else {
+                        finalStatus = 'awaiting-review';
+                        console.log(`[Execution] Action complete (manual mode), awaiting review`);
                     }
                 } else {
-                    // Manual mode: stay in current lane, mark awaiting-review
-                    // Summary is saved independently via global structuredOutput listener
-                    finalStatus = 'awaiting-review';
-                    console.log(`[Execution] Action complete (manual mode), awaiting review`);
+                    console.log(`[Execution] Task finished without clear success marker, staying in current lane.`);
                 }
             }
 
