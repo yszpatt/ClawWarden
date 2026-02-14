@@ -433,6 +433,47 @@ export class AgentManager extends EventEmitter {
         }
     }
 
+    /**
+     * Generate a structured summary from conversation history
+     */
+    async generateSummary(
+        taskId: string,
+        projectPath: string,
+        history: string,
+        outputFormat: { type: 'json_schema'; schema: Record<string, unknown> }
+    ): Promise<unknown> {
+        await this.ready;
+        const prompt = `你是一位高效的任务分析助理。请根据以下对话历史，提供一份结构化的任务总结。
+请严格遵循要求的输出格式。
+
+对话历史：
+---
+${history.substring(Math.max(0, history.length - 10000))}
+---
+
+请分析以上对话，提取关键信息并生成结构化总结。`;
+
+        const queryOptions: Options = {
+            allowedTools: [],
+            settingSources: ['project'],
+            cwd: projectPath,
+        };
+
+        (queryOptions as any).outputFormat = outputFormat;
+
+        try {
+            const stream = query({ prompt, options: queryOptions });
+            for await (const message of stream) {
+                if (message.type === 'result' && (message as any).structured_output) {
+                    return (message as any).structured_output;
+                }
+            }
+        } catch (error) {
+            console.error(`[AgentManager] Failed to generate summary for task ${taskId}:`, error);
+        }
+        return null;
+    }
+
     sendInput(taskId: string, text: string) {
         const session = this.sessions.get(taskId);
         if (session) {

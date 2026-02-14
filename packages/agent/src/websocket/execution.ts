@@ -307,6 +307,7 @@ async function handleLaneAction(
     let currentTextContent = '';
     let fullTextAccumulator = '';
     let taskSdkStructuredOutput: any = null;
+    let sdkOutputEmitted = false; // Track if AgentManager already emitted structured output
     let toolCallCounter = 0;
 
     const callbacks = {
@@ -399,6 +400,7 @@ async function handleLaneAction(
         onStructuredOutput: async (output: any) => {
             console.log(`[Execution] onStructuredOutput for task ${taskId}: `, JSON.stringify(output).substring(0, 100) + '...');
             taskSdkStructuredOutput = output;
+            sdkOutputEmitted = true; // Mark as emitted by AgentManager
 
             // Record in conversation for visibility
             const summaryMsg: ConversationMessage = {
@@ -436,6 +438,7 @@ async function handleLaneAction(
             if (finalStructuredOutput) {
                 console.log(`[Execution] Using final structured output from completion message`);
                 taskSdkStructuredOutput = finalStructuredOutput;
+                sdkOutputEmitted = true;
             }
 
             // Common completion state update
@@ -444,21 +447,59 @@ async function handleLaneAction(
             let finalPlanPath = task.planPath;
             const currentLaneId = laneId; // The lane we just finished executing
 
-            // Summary Fallback: Attempt to capture the conclusion rather than the beginning
-            if (!taskSdkStructuredOutput && fullTextAccumulator.trim().length > 10) {
-                console.log(`[Execution] Falling back to generic summary for task ${taskId}`);
-                const lines = fullTextAccumulator.trim().split('\n').filter(l => l.trim().length > 0);
-                // Take the last 3 lines as a potential summary if it's short, or a heuristic for the end
-                const lastFewLines = lines.slice(-3).join('\n');
-                const firstMeaningfulLine = lines.find(l => l.length > 10 && !l.startsWith('#')) || lines[0];
+            // Summary Fallback: If no structured output was provided by the SDK, 
+            // perform a dedicated summarization call if we have enough conversation history.
+            if (!taskSdkStructuredOutput) {
+                const conversation = await conversationStorage.load(projectPath, taskId);
+                const hasHistory = (conversation?.messages.length || 0) > 0 || fullTextAccumulator.trim().length > 10;
 
-                taskSdkStructuredOutput = {
-                    summary: lastFewLines.length > 10 ? lastFewLines.substring(0, 150) : firstMeaningfulLine.substring(0, 150),
-                    details: fullTextAccumulator.substring(Math.max(0, fullTextAccumulator.length - 2000)),
-                    result: 'success'
-                };
+                if (hasHistory) {
+                    console.log(`[Execution] Falling back to LLM summary for task ${taskId}`);
 
-                // Trigger global listener for disk saving
+                    // Create a more comprehensive history for the LLM if we have the storage version
+                    let historyToSummarize = fullTextAccumulator;
+                    if (conversation && conversation.messages.length > 0) {
+                        historyToSummarize = conversation.messages.map(m => {
+                            let text = `[${m.role.toUpperCase()}]`;
+                            if ((m as any).content) text += `: ${(m as any).content}`;
+                            if ((m as any).toolCall) {
+                                text += `\n(Tool: ${(m as any).toolCall.name})`;
+                                if ((m as any).toolCall.output) text += `\nResult: ${(m as any).toolCall.output.substring(0, 200)}...`;
+                            }
+                            return text;
+                        }).join('\n\n');
+                    }
+
+                    const summaryResult = await agentManager.generateSummary(
+                        taskId,
+                        projectPath,
+                        historyToSummarize,
+                        outputFormat
+                    );
+
+                    if (summaryResult) {
+                        taskSdkStructuredOutput = summaryResult;
+                        console.log(`[Execution] LLM fallback summary generated for task ${taskId}`);
+                    } else if (fullTextAccumulator.trim().length > 10) {
+                        // Critical fallback if LLM summary also fails
+                        console.warn(`[Execution] LLM summary fallback failed for task ${taskId}, using generic fallback`);
+                        const lines = fullTextAccumulator.trim().split('\n').filter(l => l.trim().length > 0);
+                        const lastFewLines = lines.slice(-3).join('\n');
+                        const firstMeaningfulLine = lines.find(l => l.length > 10 && !l.startsWith('#')) || lines[0];
+
+                        taskSdkStructuredOutput = {
+                            summary: lastFewLines.length > 10 ? lastFewLines.substring(0, 150) : firstMeaningfulLine.substring(0, 150),
+                            details: fullTextAccumulator.substring(Math.max(0, fullTextAccumulator.length - 2000)),
+                            result: 'success'
+                        };
+                    }
+                }
+            }
+
+            // ONLY emit structuredOutput if it was NOT already handled by AgentManager.
+            // AgentManager emits when it receives direct SDK structured output.
+            if (taskSdkStructuredOutput && !sdkOutputEmitted) {
+                console.log(`[Execution] Emitting fallback structured output for task ${taskId}`);
                 agentManager.emit('structuredOutput', {
                     taskId,
                     output: taskSdkStructuredOutput,

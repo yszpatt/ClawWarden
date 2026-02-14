@@ -42,7 +42,11 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
 
 ## 质量准则
 - 确保计划具备可落地性
-- 考虑代码质量和长期可维护性`,
+- 考虑代码质量和长期可维护性
+
+## 完成与输出
+当你认为方案已经完整且准备好进入开发阶段时，请明确告知用户。此时系统会自动请求你提供一个结构化的 JSON 总结。确保你在整个过程中记录了关键的设计决策，以便生成最终总结。
+`,
                 outputFormat: 'json_schema',
                 agentName: 'planner',
                 model: 'opus',
@@ -96,12 +100,15 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
 3. 添加必要的错误处理和日志记录
 4. 确保代码通过测试（lint、type-check）
 
-## 输出要求
+## 完成与输出
 完成后请输出：
 1. 实施总结：简要说明完成的工作
 2. 代码变更：列出修改/新增的文件和关键改动
 3. 测试结果：相关测试是否通过
-4. 后续步骤：提出下一阶段的任务或建议`,
+4. 后续步骤：提出下一阶段的任务或建议
+
+当你认为开发任务已经完成，请明确告知。确保你通过结构化输出（JSON）提供了完整的变更详情。
+`,
                 outputFormat: 'json_schema',
                 agentName: 'developer',
                 model: 'sonnet',
@@ -140,12 +147,15 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
 3. 执行必要的集成测试
 4. 生成测试报告并记录问题
 
-## 输出要求
+## 完成与输出
 完成后请输出：
 1. 测试总结：通过/失败的测试数量
 2. 问题清单：列出发现的 bug 和问题
 3. 覆盖率：代码覆盖率百分比
-4. 改进建议：对发现问题的修复建议`,
+4. 改进建议：对发现问题的修复建议
+
+当你认为测试任务已完成，请提供详细的测试结果 structured output。
+`,
                 outputFormat: 'json_schema',
                 agentName: 'tester',
                 model: 'sonnet',
