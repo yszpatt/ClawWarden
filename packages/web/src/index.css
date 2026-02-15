@@ -2339,7 +2339,97 @@ body::before {
   resize: vertical;
 }
 
-/* Action Center */
+/* Action Button Styles */
+.action-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  /* Use tertiary for base */
+  color: var(--text-primary);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.2);
+}
+
+.action-btn.is-running {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: var(--status-running);
+}
+
+.action-btn.is-running:hover {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.5);
+  box-shadow: 0 8px 16px -4px rgba(59, 130, 246, 0.2);
+}
+
+.action-btn.success {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: var(--status-completed);
+}
+
+.action-btn.success:hover {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.5);
+  box-shadow: 0 8px 16px -4px rgba(16, 185, 129, 0.2);
+}
+
+.action-btn .btn-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.action-btn .text-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.action-btn .main-text {
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.action-btn .sub-text {
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.action-btn .live-indicator {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: currentColor;
+}
+
+.action-btn .pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 2s infinite;
+}
+
+/* Action Center Container */
 .action-center {
   width: 100%;
 }
@@ -2597,6 +2687,7 @@ body::before {
 }
 
 /* Force Task Detail Main to allow panel to reach bottom */
+
 /* Force Task Detail Main to allow panel to reach bottom */
 .task-detail-main {
   width: 450px;
@@ -2606,6 +2697,129 @@ body::before {
   /* Let inner panel handle scrolling */
   display: flex;
   flex-direction: column;
+}
+
+/* Message Input Refinements */
+.message-input-container {
+  border-top: 1px solid var(--border-color);
+  padding: 1rem 1.5rem 1rem 1.5rem;
+  background: var(--bg-card);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.input-box-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-box-wrapper:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-glow);
+}
+
+.chat-textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  min-height: 24px;
+  max-height: 200px;
+  padding: 0.25rem 0;
+}
+
+.chat-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.input-actions-right {
+  display: flex;
+  align-items: center;
+  padding-bottom: 0;
+}
+
+.btn-icon-primary {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-icon-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  transform: scale(1.05);
+}
+
+.btn-icon-primary:disabled {
+  background: var(--bg-primary);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.input-bottom-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 0.25rem;
+}
+
+.left-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.action-link-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  opacity: 0.7;
+  padding: 0;
+  transition: all 0.2s;
+}
+
+.action-link-btn:hover {
+  opacity: 1;
+  color: var(--text-primary);
+}
+
+.action-link-btn.danger {
+  color: var(--status-failed);
+}
+
+.action-link-btn.danger:hover {
+  color: #f87171;
+}
+
+.right-hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.6;
 }
 
 .smart-context-card.develop .accent-icon {

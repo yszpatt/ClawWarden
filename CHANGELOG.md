@@ -4,6 +4,22 @@ This document records the major milestones and technical updates of the ClawWard
 
 ---
 
+## [2026-02-15] - Interaction Enhancement & Visual Overhaul
+
+### Workflow & Interaction Optimization
+- **Review Controls & State Recovery**:
+    - Introduced **Approve** and **Reject** actions for tasks in the `awaiting-review` status.
+    - Added a **Reject** button to safely reset task status to `idle`, allowing for iterative refinements without forced lane movement.
+    - Added a **Retry** button for `failed` tasks to quickly restart the execution cycle.
+- **Action Panel Grid**: Refactored the action button area using a responsive CSS Grid system. This ensures a clean layout when multiple actions (like Approve/Reject) are available simultaneously.
+
+### 🎨 Visual Identity Evolution (The Zinc Theme)
+- **Industrial Dark Mode**: Migrated the entire UI color palette to a professional **Zinc (900/950)** scheme. This flatter, more disciplined aesthetic reduces visual noise and aligns with modern high-end developer tools.
+- **Global Background Grid**: Replaced generic background gradients with a sophisticated, lightweight grid pattern. This creates a "design canvas" feel across the main workspace and project selector.
+- **Card-based Task Details**: Standardized task information sections using a new `.detail-card` layout, providing clear visual separation and improved information scanning for complex task outputs.
+
+---
+
 ## [2026-02-13] - Markdown Enhancement & Stability
 
 ### 🎨 Markdown Renderer Optimization

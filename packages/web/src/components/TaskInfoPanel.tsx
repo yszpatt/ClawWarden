@@ -4,7 +4,7 @@ import type { Task, StructuredOutput, LaneConfig, PlanOutput, DevelopmentOutput,
 import {
     Activity, User, Box, Code2,
     FileText, Terminal, Play, Square,
-    Save, Edit2, Trash2, X, Zap, Palette, Package, ShieldCheck, GitMerge
+    Save, Edit2, Trash2, X, Zap, Palette, Package, ShieldCheck, GitMerge, CheckCircle, XCircle, RotateCcw
 } from 'lucide-react';
 
 interface TaskInfoPanelProps {
@@ -57,7 +57,28 @@ export function TaskInfoPanel({
     };
 
     const laneConfig = laneConfigs?.[task.laneId];
+    const nextLaneConfig = (laneConfigs && laneConfig?.onCompleteLane) ? laneConfigs[laneConfig.onCompleteLane] : null;
     const latestOutput = structuredOutputs.length > 0 ? structuredOutputs[structuredOutputs.length - 1] : task.structuredOutput;
+
+    const handleMoveToNextLane = async () => {
+        if (!laneConfig?.onCompleteLane) return;
+        try {
+            await onTaskUpdate(task.id, {
+                laneId: laneConfig.onCompleteLane,
+                status: 'idle'
+            });
+        } catch (error) {
+            console.error('Failed to move lane:', error);
+        }
+    };
+
+    const handleResetStatus = async () => {
+        try {
+            await onTaskUpdate(task.id, { status: 'idle' });
+        } catch (error) {
+            console.error('Failed to reset status:', error);
+        }
+    };
 
     const ActionIcon = ({ icon, size = 20 }: { icon?: string; size?: number }) => {
         switch (icon) {
@@ -329,6 +350,37 @@ export function TaskInfoPanel({
                             <div className="live-indicator">
                                 <span className="pulse-dot"></span>
                                 Live
+                            </div>
+                        </button>
+                    ) : task.status === 'awaiting-review' && nextLaneConfig ? (
+                        <div className="action-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                            <button className="action-btn success" onClick={handleMoveToNextLane}>
+                                <div className="btn-content" style={{ justifyContent: 'center' }}>
+                                    <CheckCircle size={20} />
+                                    <div className="text-group">
+                                        <span className="main-text">Approve</span>
+                                        <span className="sub-text">Next Lane</span>
+                                    </div>
+                                </div>
+                            </button>
+                            <button className="action-btn" onClick={handleResetStatus} style={{ borderColor: 'var(--status-failed)', color: 'var(--status-failed)', background: 'rgba(239, 68, 68, 0.1)' }}>
+                                <div className="btn-content" style={{ justifyContent: 'center' }}>
+                                    <XCircle size={20} />
+                                    <div className="text-group">
+                                        <span className="main-text">Reject</span>
+                                        <span className="sub-text">Reset Status</span>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+                    ) : task.status === 'failed' ? (
+                        <button className="action-btn" onClick={handleResetStatus}>
+                            <div className="btn-content" style={{ justifyContent: 'center' }}>
+                                <RotateCcw size={20} />
+                                <div className="text-group">
+                                    <span className="main-text">Retry Task</span>
+                                    <span className="sub-text">Reset status to idle</span>
+                                </div>
                             </div>
                         </button>
                     ) : (
