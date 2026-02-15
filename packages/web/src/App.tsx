@@ -129,7 +129,7 @@ function App() {
       <Layout
         projectName={currentProject.name}
         sidebarOpen={sidebarOpen}
-        sidebarTitle={selectedTask ? '任务详情' : undefined}
+        sidebarTitle={selectedTask ? `任务ID： #${selectedTask.id}` : undefined}
         onSidebarClose={closeSidebar}
         onBackToProjects={handleBackToProjects}
         onSettingsClick={() => setShowSettings(true)}

@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Task, StructuredOutput, LaneConfig, PlanOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
 import {
     Activity, User, GitBranch, Box, Code2,
@@ -11,32 +11,51 @@ interface TaskInfoPanelProps {
     task: Task;
     projectId: string;
     laneConfigs: Record<string, LaneConfig> | null;
-    isEditing: boolean;
-    setIsEditing: (editing: boolean) => void;
-    editForm: { title: string; description: string; prompt: string };
-    setEditForm: (form: { title: string; description: string; prompt: string }) => void;
-    handleSave: () => void;
-    handleDelete: () => void;
     isTaskRunning: boolean;
+    handleDelete: () => void;
     handleStop: () => void;
     handleAction: (actionId: string) => void;
+    onTaskUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>;
     structuredOutputs: StructuredOutput[];
 }
 
 export function TaskInfoPanel({
     task,
     laneConfigs,
-    isEditing,
-    setIsEditing,
-    editForm,
-    setEditForm,
-    handleSave,
     handleDelete,
     isTaskRunning,
     handleStop,
     handleAction,
+    onTaskUpdate,
     structuredOutputs
 }: TaskInfoPanelProps) {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState({
+        title: task.title,
+        description: task.description,
+        prompt: task.prompt || ''
+    });
+
+    // Reset form when task changes
+    useEffect(() => {
+        setEditForm({
+            title: task.title,
+            description: task.description,
+            prompt: task.prompt || ''
+        });
+        setIsEditing(false); // Exit edit mode when switching tasks
+    }, [task.id, task.title, task.description, task.prompt]);
+
+    const handleSave = async () => {
+        try {
+            await onTaskUpdate(task.id, editForm);
+            setIsEditing(false);
+        } catch (error) {
+            console.error('Failed to update task:', error);
+            alert('Failed to update task');
+        }
+    };
+
     const laneConfig = laneConfigs?.[task.laneId];
     const latestOutput = structuredOutputs.length > 0 ? structuredOutputs[structuredOutputs.length - 1] : task.structuredOutput;
 
@@ -223,19 +242,20 @@ export function TaskInfoPanel({
                         />
                     </div>
                 ) : (
-                    <h1 className="task-title-large">{task.title}</h1>
+                    <h1 className="task-title-large">
+                        {task.title}
+                    </h1>
                 )}
 
                 <div className="meta-row">
-                    <LaneBadge />
-                    <div className="meta-pill">
-                        <span className="pill-label">ID</span>
-                        <span className="pill-val mono">{task.id}</span>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                        <LaneBadge />
+                        <div className="meta-pill">
+                            <User size={12} />
+                            <span className="pill-val">{task.createdBy === 'claude' ? 'Claude' : 'User'}</span>
+                        </div>
                     </div>
-                    <div className="meta-pill">
-                        <User size={12} />
-                        <span className="pill-val">{task.createdBy === 'claude' ? 'Claude' : 'User'}</span>
-                    </div>
+
                     {task.autoExecute && (
                         <div className="meta-pill auto-active">
                             <Zap size={12} /> Auto
@@ -259,8 +279,63 @@ export function TaskInfoPanel({
                     )}
                 </div>
 
+                {/* Technical Context (Prompt) */}
+                <div className="section-block" style={{ marginBottom: '1.5rem' }}>
+                    {isEditing ? (
+                        <div className="form-group">
+                            <label className="form-label">Prompt</label>
+                            <textarea
+                                className="code-textarea"
+                                value={editForm.prompt}
+                                onChange={e => setEditForm({ ...editForm, prompt: e.target.value })}
+                                placeholder="Enter system prompt instructions..."
+                                style={{ minHeight: '120px' }}
+                            />
+                        </div>
+                    ) : (
+                        task.prompt && (
+                            <div className="prompt-card">
+                                <div className="prompt-header">
+                                    <Terminal size={14} className="accent-icon" />
+                                    <span>Prompt</span>
+                                </div>
+                                <div className="prompt-content custom-scrollbar">
+                                    {task.prompt}
+                                </div>
+                            </div>
+                        )
+                    )}
+                </div>
+
+                {/* Smart Context (Dynamic based on Lane/Output) */}
+                {renderSmartContext()}
+
+                {/* Environment Context */}
+                {(task.worktree || task.claudeSession) && (
+                    <div className="section-block" style={{ marginTop: '1rem' }}>
+                        <div className="group-label">Environment</div>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            {task.worktree && (
+                                <div className="env-pill">
+                                    <GitBranch size={14} />
+                                    <span className="mono">{task.worktree.branch}</span>
+                                </div>
+                            )}
+                            {task.claudeSession && (
+                                <div className="env-pill">
+                                    <Terminal size={14} />
+                                    <span className="mono">Session Active</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* Fixed Footer Area for Actions */}
+            <div className="panel-footer-fixed">
                 {/* Main Action Area */}
-                <div className="action-center">
+                <div className="action-center" style={{ marginTop: latestOutput ? '1rem' : 0 }}>
                     {isTaskRunning ? (
                         <button className="action-btn is-running" onClick={handleStop}>
                             <div className="btn-content">
@@ -298,57 +373,6 @@ export function TaskInfoPanel({
                         </div>
                     )}
                 </div>
-
-                {/* Smart Context (Dynamic based on Lane/Output) */}
-                {renderSmartContext()}
-
-                {/* Environment Context */}
-                {(task.worktree || task.claudeSession) && (
-                    <div className="context-group">
-                        <div className="group-label">Environment</div>
-                        {task.worktree && (
-                            <div className="env-pill">
-                                <GitBranch size={14} />
-                                <span className="mono">{task.worktree.branch}</span>
-                            </div>
-                        )}
-                        {task.claudeSession && (
-                            <div className="env-pill">
-                                <Terminal size={14} />
-                                <span className="mono">Session Active</span>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Technical Details (Prompt) */}
-                <div className="collapsible-section">
-                    <div className="section-header">
-                        Technical Details
-                    </div>
-                    <div className="section-body">
-                        {isEditing ? (
-                            <div className="form-group">
-                                <label className="form-label">System Prompt</label>
-                                <textarea
-                                    className="code-textarea"
-                                    value={editForm.prompt}
-                                    onChange={e => setEditForm({ ...editForm, prompt: e.target.value })}
-                                />
-                            </div>
-                        ) : (
-                            task.prompt && (
-                                <div className="prompt-preview">
-                                    <div className="prompt-label">Prompt</div>
-                                    <div className="code-snippet">
-                                        {task.prompt.slice(0, 150)}{task.prompt.length > 150 ? '...' : ''}
-                                    </div>
-                                </div>
-                            )
-                        )}
-                    </div>
-                </div>
-
             </div>
         </div>
     );

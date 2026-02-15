@@ -1828,7 +1828,8 @@ body::before {
 .task-detail-container {
   display: flex;
   height: 100%;
-  gap: var(--bento-gap);
+  gap: 0.75rem;
+  /* Reduced from var(--bento-gap) */
   overflow: hidden;
 }
 
@@ -2456,6 +2457,114 @@ body::before {
 
 .smart-context-card.plan .accent-icon {
   color: #8b5cf6;
+}
+
+/* New Prompt Card Styles */
+.prompt-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.prompt-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.prompt-content {
+  padding: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  /* Supports line breaks */
+  word-break: break-word;
+  /* Prevents overflow */
+  max-height: 300px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.prompt-header .accent-icon {
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+/* Custom Scrollbar for Prompt Content */
+.prompt-content.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.prompt-content.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.prompt-content.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+
+/* Fixed Footer Logic */
+.panel-footer-fixed {
+  flex-shrink: 0;
+  padding: 0 0.75rem 1rem 0.75rem;
+  /* Reduced side padding to 0.75rem */
+  /* 1rem bottom padding */
+  background: transparent;
+  /* Remove background */
+  border-top: none;
+  /* Remove border */
+  box-shadow: none;
+  /* Remove shadow */
+  z-index: 10;
+  margin-top: auto;
+  /* Ensure it sticks to bottom if content is short */
+  margin-bottom: 0;
+}
+
+/* Override existing to ensure full height flex column */
+.task-info-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.panel-scroll-content {
+  flex: 1;
+  overflow-y: auto;
+  /* Add padding-bottom for visual space - reduced side padding to match footer */
+  padding: 1.5rem 0.75rem 2rem 0.75rem;
+}
+
+.task-detail-container {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Force Task Detail Main to allow panel to reach bottom */
+/* Force Task Detail Main to allow panel to reach bottom */
+.task-detail-main {
+  width: 450px;
+  flex-shrink: 0;
+  padding: 0;
+  overflow-y: hidden;
+  /* Let inner panel handle scrolling */
+  display: flex;
+  flex-direction: column;
 }
 
 .smart-context-card.develop .accent-icon {

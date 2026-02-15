@@ -131,20 +131,8 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
         onStatusChange?.('idle');
     };
 
-    const [isEditing, setIsEditing] = useState(false);
-    const [editForm, setEditForm] = useState({
-        title: task.title,
-        description: task.description,
-        prompt: task.prompt || ''
-    });
-
-    const handleSave = async () => {
-        try {
-            await updateTask(task.id, editForm);
-            setIsEditing(false);
-        } catch (error) {
-            alert('Failed to update task');
-        }
+    const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+        await updateTask(taskId, updates);
     };
 
     const handleDelete = async () => {
@@ -204,15 +192,11 @@ export function TaskDetail({ task, projectId, onClose, onStatusChange }: TaskDet
                     task={task}
                     projectId={projectId}
                     laneConfigs={laneConfigs}
-                    isEditing={isEditing}
-                    setIsEditing={setIsEditing}
-                    editForm={editForm}
-                    setEditForm={setEditForm}
-                    handleSave={handleSave}
-                    handleDelete={handleDelete}
                     isTaskRunning={isTaskRunning}
+                    handleDelete={handleDelete}
                     handleStop={handleStop}
                     handleAction={handleAction}
+                    onTaskUpdate={handleTaskUpdate}
                     structuredOutputs={structuredOutputs}
                 />
             </div>
