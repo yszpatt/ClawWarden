@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Task, StructuredOutput, LaneConfig, PlanOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
 import {
-    Activity, User, GitBranch, Box, Code2,
+    Activity, User, Box, Code2,
     FileText, Terminal, Play, Square,
     Save, Edit2, Trash2, X, Zap, Palette, Package, ShieldCheck, GitMerge
 } from 'lucide-react';
@@ -280,7 +280,7 @@ export function TaskInfoPanel({
                 </div>
 
                 {/* Technical Context (Prompt) */}
-                <div className="section-block" style={{ marginBottom: '1.5rem' }}>
+                <div className="section-block prompt-section-block">
                     {isEditing ? (
                         <div className="form-group">
                             <label className="form-label">Prompt</label>
@@ -310,26 +310,7 @@ export function TaskInfoPanel({
                 {/* Smart Context (Dynamic based on Lane/Output) */}
                 {renderSmartContext()}
 
-                {/* Environment Context */}
-                {(task.worktree || task.claudeSession) && (
-                    <div className="section-block" style={{ marginTop: '1rem' }}>
-                        <div className="group-label">Environment</div>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            {task.worktree && (
-                                <div className="env-pill">
-                                    <GitBranch size={14} />
-                                    <span className="mono">{task.worktree.branch}</span>
-                                </div>
-                            )}
-                            {task.claudeSession && (
-                                <div className="env-pill">
-                                    <Terminal size={14} />
-                                    <span className="mono">Session Active</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+
             </div>
 
             {/* Fixed Footer Area for Actions */}
