@@ -54,7 +54,7 @@ const ConversationPanel = memo(function ConversationPanel({
         }
         onTabChange?.(tab);
     };
-    const { messages, isStreaming, sendMessage, clearMessages } = useConversation({ taskId, projectId });
+    const { messages, isStreaming, sendMessage } = useConversation({ taskId, projectId });
 
     // Ensure WebSocket is connected when panel mounts
     useEffect(() => {
@@ -115,7 +115,6 @@ const ConversationPanel = memo(function ConversationPanel({
                     <QuickActions onAction={handleQuickAction} disabled={isStreaming} />
                     <MessageInput
                         onSend={handleSend}
-                        onClear={clearMessages}
                         disabled={isStreaming}
                         isStreaming={isStreaming}
                     />

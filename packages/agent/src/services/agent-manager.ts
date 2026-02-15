@@ -1,12 +1,14 @@
 import { EventEmitter } from 'events';
-import { query, createSdkMcpServer, Options, McpSdkServerConfigWithInstance, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+import { query, createSdkMcpServer, Options, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import type { TaskStatus, ToolCall } from '@clawwarden/shared';
 import { readFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 import { v4 as uuid } from 'uuid';
-import { patchTask } from '../utils/json-store';
+import { patchTask, readProjectData, writeProjectData, readGlobalConfig, findTask } from '../utils/json-store';
+import { worktreeManager } from './worktree-manager';
+import { fileWatcher } from './file-watcher';
 
 export interface AgentCallbacks {
     onLog: (message: string) => void;
@@ -36,6 +38,7 @@ export class AgentManager extends EventEmitter {
         completed?: boolean;
         laneId?: string;
     }> = new Map();
+    private globalConfig: any;
 
     private initializingTasks = new Set<string>();
 
@@ -59,6 +62,12 @@ export class AgentManager extends EventEmitter {
             }
         } catch (error) {
             // Ignore settings load errors
+        }
+
+        try {
+            this.globalConfig = await readGlobalConfig();
+        } catch (err) {
+            console.warn('[AgentManager] Failed to read global config:', err);
         }
     }
 
@@ -198,33 +207,18 @@ export class AgentManager extends EventEmitter {
                 }
             };
 
-            const antiWardenServer = createSdkMcpServer({
-                name: 'ClawWarden-Tools',
-                version: '1.0.0',
-                tools: [{
-                    name: 'antiwarden_update',
-                    description: 'Update task status and lane.',
-                    inputSchema: z.object({
-                        status: z.enum(['idle', 'running', 'completed', 'failed', 'pending-dev', 'pending-merge', 'awaiting-review']),
-                        moveTo: z.enum(['plan', 'develop', 'test', 'pending-merge', 'archived']).optional(),
-                        description: z.string().optional()
-                    }),
-                    handler: async (args) => {
-                        const { status, moveTo } = args;
-                        await patchTask(taskId, { status, laneId: moveTo });
-                        await callbacks?.onStatusUpdate?.(status as TaskStatus, moveTo as string | undefined);
-                        return { content: [{ type: 'text', text: `Updated to ${status}` }] };
-                    }
-                }]
-            });
+            const mcpServer = this.getMcpServer(taskId, projectPath, callbacks);
+
+            const skipPermissions = this.globalConfig?.settings?.claude?.defaultArgs?.includes('--dangerously-skip-permissions');
 
             const queryOptions: Options = {
-                allowedTools: ['Bash', 'Read', 'Edit', 'Glob', 'Grep', 'Find', 'Write', 'antiwarden_update'],
+                allowedTools: ['Bash', 'Read', 'Edit', 'Glob', 'Grep', 'Find', 'Write', 'clawwarden_update', 'clawwarden_create_task'],
                 settingSources: ['project'],
                 cwd: projectPath,
-                mcpServers: { 'antiwarden-local': antiWardenServer },
+                mcpServers: { 'clawwarden-local': mcpServer },
                 resume: resumeSessionId,
-                permissionMode: 'default'
+                permissionMode: skipPermissions ? 'bypassPermissions' : 'default',
+                allowDangerouslySkipPermissions: skipPermissions
             };
 
             if (outputFormat) (queryOptions as any).outputFormat = outputFormat;
@@ -308,7 +302,7 @@ export class AgentManager extends EventEmitter {
                             }
                         }
                     }
-                } catch (err) {
+                } catch (err: any) {
                     if (!taskSuccess) {
                         const session = this.sessions.get(taskId);
                         if (!session?.completed) {
@@ -344,11 +338,17 @@ export class AgentManager extends EventEmitter {
         }
     ): Promise<string> {
         const resumeSessionId = existingSessionId || this.getSessionId(taskId);
+        const mcpServer = this.getMcpServer(taskId, projectPath, callbacks);
+        const skipPermissions = this.globalConfig?.settings?.claude?.defaultArgs?.includes('--dangerously-skip-permissions');
+
         const queryOptions: Record<string, unknown> = {
-            allowedTools: options?.allowedTools || ['Read', 'Glob', 'Grep', 'Bash'],
+            allowedTools: options?.allowedTools || ['Read', 'Glob', 'Grep', 'Bash', 'clawwarden_update', 'clawwarden_create_task'],
             settingSources: ['project'],
             cwd: projectPath,
-            resume: resumeSessionId
+            mcpServers: { 'clawwarden-local': mcpServer },
+            resume: resumeSessionId,
+            permissionMode: skipPermissions ? 'bypassPermissions' : 'default',
+            allowDangerouslySkipPermissions: skipPermissions
         };
         if (options?.outputFormat) queryOptions.outputFormat = options.outputFormat;
 
@@ -522,6 +522,89 @@ ${history.substring(Math.max(0, history.length - 10000))}
 
     getSessionInfo(taskId: string): { claudeSessionId?: string, laneId?: string, outputBuffer?: string, completed?: boolean } | undefined {
         return this.sessions.get(taskId);
+    }
+
+    private getMcpServer(taskId: string, projectPath: string, callbacks?: AgentCallbacks) {
+        return createSdkMcpServer({
+            name: 'clawwarden-local',
+            version: '1.0.0',
+            tools: [{
+                name: 'clawwarden_update',
+                description: 'Update task status and lane.',
+                inputSchema: {
+                    status: z.enum(['idle', 'running', 'completed', 'failed', 'pending-dev', 'pending-merge', 'awaiting-review']),
+                    moveTo: z.enum(['plan', 'develop', 'test', 'pending-merge', 'archived']).optional(),
+                    description: z.string().optional()
+                },
+                handler: async (args: any) => {
+                    const { status, moveTo } = args;
+                    await patchTask(taskId, { status, laneId: moveTo });
+                    await callbacks?.onStatusUpdate?.(status as TaskStatus, moveTo as string | undefined);
+                    return { content: [{ type: 'text', text: `Updated to ${status}` }] };
+                }
+            }, {
+                name: 'clawwarden_create_task',
+                description: 'Create a new task card on the kanban board. Use this when you discover additional work needed, bugs to fix, refactoring opportunities, or follow-up tasks during execution.',
+                inputSchema: {
+                    title: z.string().describe('Task title - concise and actionable'),
+                    description: z.string().describe('Detailed task description'),
+                    laneId: z.enum(['plan', 'develop', 'test', 'pending-merge'])
+                        .default('plan')
+                        .describe('Target lane, defaults to plan'),
+                    priority: z.enum(['low', 'medium', 'high']).optional()
+                        .describe('Task priority'),
+                    prompt: z.string().optional()
+                        .describe('Optional initial prompt or instructions for this task'),
+                },
+                handler: async (args: any) => {
+                    const targetLane = args.laneId || 'plan';
+                    const result = await findTask(taskId);
+                    if (!result) {
+                        return {
+                            content: [{ type: 'text', text: `❌ Error: Project context for task ${taskId} could not be resolved. This may happen if the task was recently moved or deleted.` }]
+                        };
+                    }
+
+                    const { project, data } = result;
+                    const rootPath = project.path;
+
+                    const newTask = {
+                        id: uuid(),
+                        title: args.title,
+                        description: args.description,
+                        laneId: targetLane,
+                        order: data.tasks.filter(t => t.laneId === targetLane).length,
+                        status: 'idle' as const,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                        createdBy: 'claude' as const,
+                        prompt: args.prompt,
+                        metadata: {
+                            ...(args.priority && { priority: args.priority }),
+                            createdFromTask: taskId,   // Traceability
+                        },
+                        worktree: undefined as any
+                    };
+
+                    // Try to create worktree immediately
+                    try {
+                        const worktree = await worktreeManager.createWorktree(rootPath, newTask.id);
+                        if (worktree) {
+                            newTask.worktree = worktree;
+                        }
+                    } catch (wtError) {
+                        console.error(`[AgentManager] Failed to create worktree for new task ${newTask.id}:`, wtError);
+                    }
+
+                    data.tasks.push(newTask as any);
+                    await writeProjectData(rootPath, data);
+
+                    return {
+                        content: [{ type: 'text', text: `✅ Created task "${args.title}" (ID: ${newTask.id}) in ${targetLane} lane${newTask.worktree ? ' with worktree' : ''}` }]
+                    };
+                }
+            }]
+        });
     }
 
     private generateMessageId(): string {

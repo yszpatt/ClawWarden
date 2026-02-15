@@ -43,15 +43,24 @@ function App() {
           status: message.status as Task['status'],
           laneId: message.laneId,
         });
+      } else if (message.type === 'project-update' && message.data) {
+        // Full project refresh from server-side file watcher
+        console.log('[WebSocket] Received project-update', message.projectId);
+        setProjectData(message.data);
       }
     });
     return unsubscribe;
-  }, [syncTaskUpdate]);
+  }, [syncTaskUpdate, setProjectData]);
 
   // Load project data when a project is selected
   useEffect(() => {
     if (currentProject) {
       loadProjectData(currentProject.id);
+
+      // Subscribe to real-time updates for this project
+      connectionManager.subscribeToProject(currentProject.id);
+    } else {
+      connectionManager.subscribeToProject(null);
     }
   }, [currentProject?.id]);
 

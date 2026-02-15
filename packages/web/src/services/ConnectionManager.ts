@@ -23,6 +23,8 @@ export interface WsMessage {
     status?: string;
     laneId?: string;
     structuredOutput?: unknown;
+    projectId?: string;
+    data?: any;
 }
 
 type MessageHandler = (message: WsMessage) => void;
@@ -36,6 +38,7 @@ export class ConnectionManager {
     private maxReconnectAttempts = 5;
     private reconnectDelay = 1000;
     private isConnecting = false;
+    private subscribedProjectId: string | null = null;
 
     private constructor() { }
 
@@ -70,6 +73,15 @@ export class ConnectionManager {
                 if (msg) {
                     ws.send(JSON.stringify(msg));
                 }
+            }
+
+            // Restore project subscription on reconnect
+            if (this.subscribedProjectId) {
+                console.log('[ConnectionManager] Restoring project subscription:', this.subscribedProjectId);
+                ws.send(JSON.stringify({
+                    type: 'subscribe',
+                    projectId: this.subscribedProjectId
+                }));
             }
         };
 
@@ -136,6 +148,21 @@ export class ConnectionManager {
                 }
             }
         };
+    }
+
+    /**
+     * Subscribe to a project for real-time file updates.
+     * Persists across reconnections.
+     */
+    subscribeToProject(projectId: string | null): void {
+        this.subscribedProjectId = projectId;
+        if (projectId && this.ws?.readyState === WebSocket.OPEN) {
+            console.log('[ConnectionManager] Sending project subscription:', projectId);
+            this.ws.send(JSON.stringify({
+                type: 'subscribe',
+                projectId
+            }));
+        }
     }
 
     /**

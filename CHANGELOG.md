@@ -18,6 +18,17 @@ This document records the major milestones and technical updates of the ClawWard
 - **Global Background Grid**: Replaced generic background gradients with a sophisticated, lightweight grid pattern. This creates a "design canvas" feel across the main workspace and project selector.
 - **Card-based Task Details**: Standardized task information sections using a new `.detail-card` layout, providing clear visual separation and improved information scanning for complex task outputs.
 
+### 🔄 Real-time Synchronization & System Robustness
+- **Event-Driven UI Refresh**:
+    - Relocated the update trigger to the lowest `JSONStore` layer. Any data modification (task creation, status change, reordering) now instantly triggers a project-wide broadcast.
+    - Eliminated reliance on OS-level file notifications for UI updates, resulting in near-zero latency.
+- **Robust WebSocket Management**:
+    - **Persistent Subscriptions**: Enhanced `ConnectionManager` to maintain project-specific subscriptions.
+    - **Auto-Reconnection Recovery**: Implemented automatic subscription restoration upon WebSocket reconnection, ensuring real-time capabilities persist after dev-mode hot reloads or network blips.
+- **Error Handling & Stability**:
+    - Cleaned up redundant broadcast logic in the backend to prevent message loops.
+    - Fixed critical compilation errors in the Task Detail panel regarding message input handlers.
+
 ---
 
 ## [2026-02-13] - Markdown Enhancement & Stability

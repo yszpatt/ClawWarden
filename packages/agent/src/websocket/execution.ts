@@ -11,6 +11,14 @@ import { getSchemaForLane, getOutputTypeForLane } from '../services/schemas';
 import { getMergedLaneConfig } from '../utils/lane-config-loader';
 import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task, ToolCall, AssistantMessage, LaneActionConfig } from '@clawwarden/shared';
 import { getLanePrompt, getLaneConfig } from '@clawwarden/shared';
+import { fileWatcher, FileChangeEvent } from '../services/file-watcher';
+
+interface ExecutionClient {
+    connection: SocketStream;
+    projectId?: string;
+}
+
+const clients: Set<ExecutionClient> = new Set();
 
 // Track running lane executions for stop functionality
 // Maps taskId to an abort controller or stop flag
@@ -184,7 +192,9 @@ interface ConversationLaneActionStartMessage {
     actionId: string;
 }
 
-type ClientMessage = ExecuteMessage | InputMessage | StopMessage | ResizeMessage | AttachMessage | ConversationUserInputMessage | ConversationPlanStartMessage | ConversationExecuteStartMessage | ConversationLaneActionStartMessage;
+interface SubscribeMessage { type: 'subscribe'; projectId: string; }
+
+type ClientMessage = SubscribeMessage | ExecuteMessage | InputMessage | StopMessage | ResizeMessage | AttachMessage | ConversationUserInputMessage | ConversationPlanStartMessage | ConversationExecuteStartMessage | ConversationLaneActionStartMessage;
 
 /**
  * 统一的泳道操作处理入口
@@ -668,7 +678,43 @@ export async function executionHandler(fastify: FastifyInstance) {
         }
     });
 
+    // Listen for file changes and broadcast to clients on /ws/execute
+    fileWatcher.on('change', async (event: FileChangeEvent) => {
+        console.log(`[Execution] FileWatcher change detected: path=${event.path}, projectPath=${event.projectPath}`);
+        try {
+            const data = await readProjectData(event.projectPath);
+            const config = await readGlobalConfig();
+            const project = config.projects.find(p => p.path === event.projectPath);
+
+            if (!project) {
+                console.warn(`[Execution] No project found in config matching path: ${event.projectPath}`);
+                return;
+            }
+
+            console.log(`[Execution] Broadcasting project-update for project: ${project.id} (${project.name}) to ${clients.size} clients`);
+            const message = JSON.stringify({
+                type: 'project-update',
+                projectId: project.id,
+                data,
+            });
+
+            let broadcastCount = 0;
+            for (const client of clients) {
+                if (client.projectId === project.id && client.connection.socket.readyState === 1) {
+                    client.connection.socket.send(message);
+                    broadcastCount++;
+                }
+            }
+            console.log(`[Execution] Successfully sent project-update to ${broadcastCount} matching clients`);
+        } catch (err) {
+            console.error('[Execution] File change broadcast error:', err);
+        }
+    });
+
     fastify.get('/ws/execute', { websocket: true }, (connection, _request) => {
+        const client: ExecutionClient = { connection };
+        clients.add(client);
+
         let currentTaskId: string | null = null;
 
         const errorListener = (event: { taskId: string, error: Error }) => {
@@ -763,6 +809,19 @@ export async function executionHandler(fastify: FastifyInstance) {
             try {
                 const message = JSON.parse(rawMessage.toString()) as ClientMessage;
                 switch (message.type) {
+                    case 'subscribe':
+                        client.projectId = message.projectId;
+                        console.log(`[Execution] Client subscribed to project: ${message.projectId}`);
+
+                        // Ensure file watcher is running for this project
+                        const config = await readGlobalConfig();
+                        const project = config.projects.find(p => p.id === message.projectId);
+                        if (project) {
+                            fileWatcher.watchProject(project.path);
+                        }
+
+                        connection.socket.send(JSON.stringify({ type: 'subscribed', projectId: message.projectId }));
+                        break;
                     case 'execute': currentTaskId = message.taskId; await handleExecute(connection, message); break;
                     case 'stop': if (message.taskId) await handleStop(message.taskId, connection); break;
                     case 'attach': currentTaskId = (message as any).taskId; await handleAttach(connection, message as AttachMessage); break;
@@ -789,6 +848,7 @@ export async function executionHandler(fastify: FastifyInstance) {
         });
 
         connection.socket.on('close', () => {
+            clients.delete(client);
             agentManager.off('error', errorListener);
             agentManager.off('statusUpdate', statusUpdateListener);
             agentManager.off('sessionStart', sessionStartListener);

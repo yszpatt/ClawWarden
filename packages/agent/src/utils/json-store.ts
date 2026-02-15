@@ -4,6 +4,7 @@ import { dirname } from 'path';
 import type { GlobalConfig, ProjectData } from '@clawwarden/shared';
 import { DEFAULT_LANES, DEFAULT_SETTINGS } from '@clawwarden/shared';
 import { GLOBAL_CONFIG_FILE, getProjectTasksFile } from './paths';
+import { fileWatcher } from '../services/file-watcher';
 
 export async function ensureDir(filePath: string): Promise<void> {
     const dir = dirname(filePath);
@@ -175,6 +176,13 @@ export async function writeProjectData(projectPath: string, data: ProjectData): 
     const filePath = getProjectTasksFile(projectPath);
     const content = JSON.stringify(data, null, 2);
     await withLock(filePath, () => atomicWriteFile(filePath, content));
+
+    // Manually trigger file watcher for immediate UI update
+    fileWatcher.emit('change', {
+        type: 'change',
+        path: filePath,
+        projectPath
+    });
 }
 
 /**
@@ -199,6 +207,14 @@ export async function patchTask(taskId: string, patch: any): Promise<boolean> {
 
                 const content = JSON.stringify(data, null, 2);
                 await atomicWriteFile(filePath, content);
+
+                // Trigger file watcher for real-time updates
+                fileWatcher.emit('change', {
+                    type: 'change',
+                    path: filePath,
+                    projectPath: proj.path
+                });
+
                 return true;
             }
             return false;
