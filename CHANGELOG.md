@@ -13,6 +13,12 @@ This document records the major milestones and technical updates of the ClawWard
     - Added a **Retry** button for `failed` tasks to quickly restart the execution cycle.
 - **Action Panel Grid**: Refactored the action button area using a responsive CSS Grid system. This ensures a clean layout when multiple actions (like Approve/Reject) are available simultaneously.
 
+### 🛠️ MCP Tools & Process Integration
+- **Direct Task Creation Tool**:
+    - Introduced the `create_task` MCP tool, allowing the Claude Agent to autonomously spawn sub-tasks or follow-up tasks into any lane.
+    - Integrated automatic **Git Worktree management** into the MCP tool flow; new tasks created via MCP get an isolated development environment immediately.
+    - Enhanced task metadata to include traceability, linking MCP-created tasks to their parent sessions.
+
 ### 🎨 Visual Identity Evolution (The Zinc Theme)
 - **Industrial Dark Mode**: Migrated the entire UI color palette to a professional **Zinc (900/950)** scheme. This flatter, more disciplined aesthetic reduces visual noise and aligns with modern high-end developer tools.
 - **Global Background Grid**: Replaced generic background gradients with a sophisticated, lightweight grid pattern. This creates a "design canvas" feel across the main workspace and project selector.
