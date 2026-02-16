@@ -1,4 +1,6 @@
-# 🦀 VibeWarden
+# VibeWarden
+
+![VibeWarden Logo](docs/logo-pixel.png)
 
 [![English](https://img.shields.io/badge/lang-English-blue.svg)](#)
 [![简体中文](https://img.shields.io/badge/lang-简体中文-red.svg)](README.zh-CN.md)

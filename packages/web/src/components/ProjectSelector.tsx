@@ -83,13 +83,14 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
     return (
         <div className="project-selector-page">
             <div className="project-selector-container">
-                <div className="project-selector-header">
-                    <div className="logo-section" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <Logo size={42} />
-                        <h1>VibeWarden</h1>
-                        <p>Claude Code 任务编排系统</p>
-                    </div>
-                    <button className="settings-btn" onClick={() => setShowSettings(true)} title="设置">
+                <div className="project-selector-header" style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                    <Logo size={80} />
+                    <button
+                        className="settings-btn"
+                        onClick={() => setShowSettings(true)}
+                        title="设置"
+                        style={{ position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}
+                    >
                         ⚙️
                     </button>
                 </div>

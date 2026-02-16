@@ -22,8 +22,7 @@ export function Header({ projectName, onBackToProjects, onSettingsClick }: Heade
                     </button>
                 )}
                 <div className="header-brand">
-                    <Logo size={28} />
-                    <h1>VibeWarden</h1>
+                    <Logo size={30} />
                 </div>
             </div>
             <div className="header-actions">

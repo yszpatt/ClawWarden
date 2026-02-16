@@ -1,7 +1,8 @@
-# 🦀 VibeWarden
+# VibeWarden
 
-[![English](https://img.shields.io/badge/lang-English-blue.svg)](README.md)
-[![简体中文](https://img.shields.io/badge/lang-简体中文-red.svg)](#)
+![VibeWarden Logo](docs/logo-pixel.png)
+
+> **The Fluid Guardian**：基于流动的“Vibe”灵感与坚固的“Warden”架构，重新定义的 AI 协作管理平台。
 
 VibeWarden 是一个为 **Claude Code CLI** 量身定制的任务看板管理系统。它为管理复杂的开发任务提供了一个可视化界面，支持自动化的 Git Worktree 隔离、增量式任务摘要，以及原生的对话式交互模型。
 

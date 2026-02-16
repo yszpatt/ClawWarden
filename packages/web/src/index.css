@@ -754,20 +754,20 @@ body::before {
 
 .project-selector-container {
   width: 100%;
-  max-width: 680px;
-  padding: 2.5rem;
+  max-width: 600px;
+  padding: 2rem;
 
   /* Glassmorphism Card */
-  background: rgba(24, 24, 27, 0.6);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  border-radius: 24px;
+  background: rgba(24, 24, 27, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.6);
+  border-radius: 20px;
 
   position: relative;
   z-index: 10;
-  animation: slideUpFade 0.6s ease-out;
+  animation: slideUpFade 0.5s ease-out;
 }
 
 @keyframes slideUpFade {
@@ -783,8 +783,10 @@ body::before {
 }
 
 .project-selector-header {
-  text-align: center;
-  margin-bottom: 2.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
 }
 
 .logo-section h1 {
