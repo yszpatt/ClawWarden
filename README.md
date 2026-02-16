@@ -1,23 +1,29 @@
 # VibeWarden
 
-![VibeWarden Logo](docs/logo-pixel.png)
+![VibeWarden Logo](packages/web/public/logo-pixel.png)
 
-[![English](https://img.shields.io/badge/lang-English-blue.svg)](#)
+[![English](https://img.shields.io/badge/lang-English-blue.svg)](README.md)
 [![简体中文](https://img.shields.io/badge/lang-简体中文-red.svg)](README.zh-CN.md)
 
-VibeWarden is a sophisticated Kanban-style task management dashboard designed to orchestrate and monitor **Claude Code CLI** workflows. It provides a visual interface for managing complex development tasks, featuring automated worktree isolation, incremental task summaries, and a native conversational interaction model.
+> **Vibe-Coding** is an ambitious plan proposed by AI to phase out all programmers, aiming to reduce human intervention in AI evolution...
+
+---
+
+![screenshot-o](screenshot-overview.png)
+
+VibeWarden is a Kanban-style management tool for **Claude Code**, providing a visual interface with agile development workflows to manage complex tasks through Kanban cards.
 
 ---
 
 ## ✨ Key Features
 
-- **📋 Kanban Workflow**: Manage tasks through distinct stages (Plan, Develop, Test, etc.).
-- **📝 Incremental Summaries**: Hierarchical, accordion-style task progression logs with Markdown support.
-- **🗣️ Conversational Interaction**: Native chat interface for direct instruction and feedback during task execution.
-- **🛠️ Worktree Management**: Automated `git worktree` isolation for concurrent task execution.
-- **🤖 AI-Assisted Merge**: Automated Git branch merging and conflict resolution powered by Claude Agents.
-- **🔄 Lane-Specific Logic**: Synchronized themes, icons, and specialized actions for each development lane.
-- **🎨 Modern UI**: Sleek React-based interface with dark mode, deep glassmorphism, and drag-and-drop support.
+- **📋 Kanban Workflow**: Manage tasks through clear stages (Plan, Develop, Test, etc.).
+- **📝 Incremental Summaries**: Hierarchical, collapsible progress logs with Markdown rendering.
+- **🗣️ Conversational Interaction**: Native search/chat interface for direct command issuance and feedback during task execution.
+- **🛠️ Worktree Management**: Automated `git worktree` isolation to support concurrent multi-task development.
+- **🤖 AI-Assisted Merge**: Automated Git branch merging and conflict resolution driven by Claude Agents, acting as a release engineer.
+- **🔄 Lane-Specific Logic**: Synchronized themes, icons, and specialized actions for each development stage.
+- **🎨 Modern UI**: Clean React-based interface with dark mode, deep glassmorphism, and drag-and-drop support.
 - **📜 [Changelog](CHANGELOG.md)**: Explore the latest updates and project milestones.
 
 ---
@@ -68,7 +74,7 @@ Start both the agent (backend) and the web dashboard in development mode:
 pnpm dev
 ```
 
-The web interface will be available at `http://localhost:5173` (or the port specified by Vite), and the agent will run on `http://localhost:4001`.
+The web interface typically runs on `http://localhost:5173`, and the agent on `http://localhost:4001`.
 
 ---
 
