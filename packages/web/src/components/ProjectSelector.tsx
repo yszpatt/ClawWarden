@@ -86,7 +86,7 @@ export function ProjectSelector({ onSelectProject }: ProjectSelectorProps) {
                 <div className="project-selector-header">
                     <div className="logo-section" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <Logo size={42} />
-                        <h1>ClawWarden</h1>
+                        <h1>VibeWarden</h1>
                         <p>Claude Code 任务编排系统</p>
                     </div>
                     <button className="settings-btn" onClick={() => setShowSettings(true)} title="设置">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchFsList } from '../api/projects';
-import type { FsItem, FsListResponse } from '@clawwarden/shared';
+import type { FsItem, FsListResponse } from '@vibewarden/shared';
 
 interface FolderPickerProps {
     onSelect: (path: string) => void;

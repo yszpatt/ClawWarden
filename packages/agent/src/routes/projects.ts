@@ -6,7 +6,7 @@ import { join } from 'path';
 import * as fs from 'fs';
 import { readGlobalConfig, writeGlobalConfig, initializeProject, readProjectData } from '../utils/json-store';
 import { installClaudeDirectory, hasClaudeInstalled } from '../services/claude-installer';
-import type { ProjectRef } from '@clawwarden/shared';
+import type { ProjectRef } from '@vibewarden/shared';
 
 const execAsync = promisify(exec);
 
@@ -32,9 +32,9 @@ async function ensureGitRepo(projectPath: string): Promise<void> {
         console.log('[Project] Initializing git repository in:', projectPath);
         await execAsync('git init', { cwd: projectPath });
         // Create initial commit with .gitignore
-        await execAsync('echo "node_modules/\\n.clawwarden/\\n.worktrees/\\n.claude/" > .gitignore', { cwd: projectPath });
+        await execAsync('echo "node_modules/\\n.vibewarden/\\n.worktrees/\\n.claude/" > .gitignore', { cwd: projectPath });
         await execAsync('git add .gitignore', { cwd: projectPath });
-        await execAsync('git commit -m "Initial commit by ClawWarden"', { cwd: projectPath });
+        await execAsync('git commit -m "Initial commit by VibeWarden"', { cwd: projectPath });
         console.log('[Project] Git repository initialized with initial commit');
     } else {
         console.log('[Project] Project is already a git repository');
@@ -72,8 +72,8 @@ export async function projectRoutes(fastify: FastifyInstance) {
             lastOpenedAt: new Date().toISOString(),
         };
 
-        const clawwardenConfigPath = join(path, '.clawwarden');
-        const hasClawwarden = fs.existsSync(clawwardenConfigPath);
+        const vibewardenConfigPath = join(path, '.vibewarden');
+        const hasClawwarden = fs.existsSync(vibewardenConfigPath);
         const hasClaude = hasClaudeInstalled(path);
 
         const { generateProjectLaneConfig, PROJECT_LANE_CONFIG_FILE } = await import('../utils/lane-config-loader');
@@ -95,7 +95,7 @@ export async function projectRoutes(fastify: FastifyInstance) {
         // Install .claude directory (always runs, skips if exists)
         const installResult = await installClaudeDirectory(path, {
             inheritGlobalRules,
-            createClawWardenIntegration: true,
+            createVibeWardenIntegration: true,
             overwriteExisting: false
         });
 
@@ -137,7 +137,7 @@ export async function projectRoutes(fastify: FastifyInstance) {
         if (!project) throw { statusCode: 404, message: 'Project not found' };
 
         // We need an utility to get all merged configs for a project
-        const { DEFAULT_LANE_CONFIGS } = await import('@clawwarden/shared');
+        const { DEFAULT_LANE_CONFIGS } = await import('@vibewarden/shared');
         const { getMergedLaneConfig } = await import('../utils/lane-config-loader');
 
         const mergedConfigs: Record<string, any> = {};

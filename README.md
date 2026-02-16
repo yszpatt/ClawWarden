@@ -1,9 +1,9 @@
-# 🦀 ClawWarden
+# 🦀 VibeWarden
 
 [![English](https://img.shields.io/badge/lang-English-blue.svg)](#)
 [![简体中文](https://img.shields.io/badge/lang-简体中文-red.svg)](README.zh-CN.md)
 
-ClawWarden is a sophisticated Kanban-style task management dashboard designed to orchestrate and monitor **Claude Code CLI** workflows. It provides a visual interface for managing complex development tasks, featuring automated worktree isolation, incremental task summaries, and a native conversational interaction model.
+VibeWarden is a sophisticated Kanban-style task management dashboard designed to orchestrate and monitor **Claude Code CLI** workflows. It provides a visual interface for managing complex development tasks, featuring automated worktree isolation, incremental task summaries, and a native conversational interaction model.
 
 ---
 
@@ -22,7 +22,7 @@ ClawWarden is a sophisticated Kanban-style task management dashboard designed to
 
 ## 🏗️ Architecture
 
-ClawWarden is built as a monorepo containing three main components:
+VibeWarden is built as a monorepo containing three main components:
 
 - **`packages/web`**: The frontend React dashboard.
 - **`packages/agent`**: The backend Fastify server that coordinates Claude Code and the filesystem.
@@ -50,7 +50,7 @@ ClawWarden is built as a monorepo containing three main components:
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd ClawWarden
+   cd VibeWarden
    ```
 
 2. Install dependencies:
@@ -73,7 +73,7 @@ The web interface will be available at `http://localhost:5173` (or the port spec
 ## 📂 Project Structure
 
 ```text
-ClawWarden/
+VibeWarden/
 ├── packages/
 │   ├── web/      # React frontend
 │   ├── agent/    # Fastify backend

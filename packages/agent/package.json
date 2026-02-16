@@ -1,16 +1,17 @@
 {
-    "name": "@clawwarden/agent",
-    "version": "0.1.0",
+    "name": "@vibewarden/agent",
+    "version": "1.0.0",
     "type": "module",
-    "main": "./dist/index.js",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
     "scripts": {
         "build": "tsc",
         "dev": "tsx watch src/index.ts",
         "start": "node dist/index.js"
     },
     "dependencies": {
-        "@anthropic-ai/claude-agent-sdk": "^0.2.25",
-        "@clawwarden/shared": "workspace:*",
+        "@anthropic-ai/claude-agent-sdk": "^0.2.42",
+        "@vibewarden/shared": "workspace:*",
         "@fastify/cors": "^8.4.0",
         "@fastify/websocket": "^8.3.0",
         "chokidar": "^3.5.3",

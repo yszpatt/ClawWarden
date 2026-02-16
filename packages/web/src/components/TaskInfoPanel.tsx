@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import type { Task, StructuredOutput, LaneConfig, PlanOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
+import type { Task, StructuredOutput, LaneConfig, PlanOutput, DevelopmentOutput, TestingOutput } from '@vibewarden/shared';
 import {
     Activity, User, Box, Code2,
     FileText, Terminal, Play, Square,

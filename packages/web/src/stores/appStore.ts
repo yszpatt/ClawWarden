@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Task, ProjectRef, ProjectData, LaneConfig } from '@clawwarden/shared';
+import type { Task, ProjectRef, ProjectData, LaneConfig } from '@vibewarden/shared';
 import { batchUpdateTasks, updateTask as apiUpdateTask, deleteTask as apiDeleteTask, fetchProjectData } from '../api/projects';
 
 interface AppState {

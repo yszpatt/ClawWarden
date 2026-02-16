@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { readGlobalConfig, writeGlobalConfig } from '../utils/json-store';
-import type { GlobalSettings } from '@clawwarden/shared';
+import type { GlobalSettings } from '@vibewarden/shared';
 
 export async function settingsRoutes(fastify: FastifyInstance) {
     // Get global settings

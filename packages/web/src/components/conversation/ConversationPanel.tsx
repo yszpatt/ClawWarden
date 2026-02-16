@@ -7,7 +7,7 @@ import { MessageInput } from './MessageInput';
 import { QuickActions } from './QuickActions';
 import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
 import { StructuredOutputViewer } from '../StructuredOutput';
-import type { StructuredOutput } from '@clawwarden/shared';
+import type { StructuredOutput } from '@vibewarden/shared';
 
 interface ConversationPanelProps {
     taskId: string;

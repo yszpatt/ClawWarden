@@ -1,9 +1,9 @@
-# 🦀 ClawWarden
+# 🦀 VibeWarden
 
 [![English](https://img.shields.io/badge/lang-English-blue.svg)](README.md)
 [![简体中文](https://img.shields.io/badge/lang-简体中文-red.svg)](#)
 
-ClawWarden 是一个为 **Claude Code CLI** 量身定制的任务看板管理系统。它为管理复杂的开发任务提供了一个可视化界面，支持自动化的 Git Worktree 隔离、增量式任务摘要，以及原生的对话式交互模型。
+VibeWarden 是一个为 **Claude Code CLI** 量身定制的任务看板管理系统。它为管理复杂的开发任务提供了一个可视化界面，支持自动化的 Git Worktree 隔离、增量式任务摘要，以及原生的对话式交互模型。
 
 ---
 
@@ -22,7 +22,7 @@ ClawWarden 是一个为 **Claude Code CLI** 量身定制的任务看板管理系
 
 ## 🏗️ 系统架构
 
-ClawWarden 采用 Monorepo 结构，包含三个核心组件：
+VibeWarden 采用 Monorepo 结构，包含三个核心组件：
 
 - **`packages/web`**: 基于 React 的前端仪表盘。
 - **`packages/agent`**: 基于 Fastify 的后端服务器，负责协调 Claude Code 和文件系统。
@@ -50,7 +50,7 @@ ClawWarden 采用 Monorepo 结构，包含三个核心组件：
 1. 克隆仓库：
    ```bash
    git clone <repository-url>
-   cd ClawWarden
+   cd VibeWarden
    ```
 
 2. 安装依赖：
@@ -73,7 +73,7 @@ Web 界面通常运行在 `http://localhost:5173`，Agent 运行在 `http://loca
 ## 📂 项目结构
 
 ```text
-ClawWarden/
+VibeWarden/
 ├── packages/
 │   ├── web/      # React 前端
 │   ├── agent/    # Fastify 后端

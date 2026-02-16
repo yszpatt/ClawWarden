@@ -1,4 +1,4 @@
-import type { Task, Lane } from '@clawwarden/shared';
+import type { Task, Lane } from '@vibewarden/shared';
 import { Zap } from 'lucide-react';
 
 interface TaskCardProps {

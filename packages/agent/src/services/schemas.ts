@@ -1,4 +1,4 @@
-import type { PlanOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
+import type { PlanOutput, DevelopmentOutput, TestingOutput } from '@vibewarden/shared';
 
 /**
  * JSON Schemas for structured outputs from Claude Agent SDK

@@ -25,8 +25,8 @@ const SENSITIVE_KEYS = [
 export interface InstallClaudeOptions {
     /** Whether to inherit global rules from ~/.claude/rules/ */
     inheritGlobalRules?: boolean;
-    /** Whether to create ClawWarden integration files */
-    createClawWardenIntegration?: boolean;
+    /** Whether to create VibeWarden integration files */
+    createVibeWardenIntegration?: boolean;
     /** Whether to overwrite existing files */
     overwriteExisting?: boolean;
     /** Custom path to user's global .claude directory */
@@ -185,12 +185,12 @@ export function copyTemplateReadmes(projectPath: string, overwrite: boolean): vo
 }
 
 /**
- * Copy ClawWarden integration rules to the project
+ * Copy VibeWarden integration rules to the project
  */
-export function copyClawWardenIntegration(projectPath: string, overwrite: boolean): void {
+export function copyVibeWardenIntegration(projectPath: string, overwrite: boolean): void {
     const claudeDir = join(projectPath, '.claude');
-    const integrationSource = join(CLAUDE_TEMPLATE_DIR, 'rules', 'clawwarden-integration.md');
-    const integrationDest = join(claudeDir, 'rules', 'clawwarden-integration.md');
+    const integrationSource = join(CLAUDE_TEMPLATE_DIR, 'rules', 'vibewarden-integration.md');
+    const integrationDest = join(claudeDir, 'rules', 'vibewarden-integration.md');
 
     copyFileSafe(integrationSource, integrationDest, overwrite);
 }
@@ -233,9 +233,9 @@ function copyDirectory(source: string, target: string): void {
 }
 
 /**
- * Copy ClawWarden skills to the project
+ * Copy VibeWarden skills to the project
  */
-export function copyClawWardenSkills(projectPath: string, overwrite: boolean): string[] {
+export function copyVibeWardenSkills(projectPath: string, overwrite: boolean): string[] {
     const installed: string[] = [];
     const templateSkillsDir = join(CLAUDE_TEMPLATE_DIR, 'skills');
     const targetSkillsDir = join(projectPath, '.claude', 'skills');
@@ -250,9 +250,9 @@ export function copyClawWardenSkills(projectPath: string, overwrite: boolean): s
         return installed;
     }
 
-    // Get all skill directories (starting with 'clawwarden-')
+    // Get all skill directories (starting with 'vibewarden-')
     const entries = readdirSync(templateSkillsDir, { withFileTypes: true });
-    const skillDirs = entries.filter(e => e.isDirectory() && e.name.startsWith('clawwarden-'));
+    const skillDirs = entries.filter(e => e.isDirectory() && e.name.startsWith('vibewarden-'));
 
     for (const skillDir of skillDirs) {
         const sourcePath = join(templateSkillsDir, skillDir.name);

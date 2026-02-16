@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { query, createSdkMcpServer, Options, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
-import type { TaskStatus, ToolCall } from '@clawwarden/shared';
+import type { TaskStatus, ToolCall } from '@vibewarden/shared';
 import { readFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
@@ -212,10 +212,10 @@ export class AgentManager extends EventEmitter {
             const skipPermissions = this.globalConfig?.settings?.claude?.defaultArgs?.includes('--dangerously-skip-permissions');
 
             const queryOptions: Options = {
-                allowedTools: ['Bash', 'Read', 'Edit', 'Glob', 'Grep', 'Find', 'Write', 'clawwarden_update', 'clawwarden_create_task'],
+                allowedTools: ['Bash', 'Read', 'Edit', 'Glob', 'Grep', 'Find', 'Write', 'vibewarden_update', 'vibewarden_create_task'],
                 settingSources: ['project'],
                 cwd: projectPath,
-                mcpServers: { 'clawwarden-local': mcpServer },
+                mcpServers: { 'vibewarden-local': mcpServer },
                 resume: resumeSessionId,
                 permissionMode: skipPermissions ? 'bypassPermissions' : 'default',
                 allowDangerouslySkipPermissions: skipPermissions
@@ -342,10 +342,10 @@ export class AgentManager extends EventEmitter {
         const skipPermissions = this.globalConfig?.settings?.claude?.defaultArgs?.includes('--dangerously-skip-permissions');
 
         const queryOptions: Record<string, unknown> = {
-            allowedTools: options?.allowedTools || ['Read', 'Glob', 'Grep', 'Bash', 'clawwarden_update', 'clawwarden_create_task'],
+            allowedTools: options?.allowedTools || ['Read', 'Glob', 'Grep', 'Bash', 'vibewarden_update', 'vibewarden_create_task'],
             settingSources: ['project'],
             cwd: projectPath,
-            mcpServers: { 'clawwarden-local': mcpServer },
+            mcpServers: { 'vibewarden-local': mcpServer },
             resume: resumeSessionId,
             permissionMode: skipPermissions ? 'bypassPermissions' : 'default',
             allowDangerouslySkipPermissions: skipPermissions
@@ -526,10 +526,10 @@ ${history.substring(Math.max(0, history.length - 10000))}
 
     private getMcpServer(taskId: string, projectPath: string, callbacks?: AgentCallbacks) {
         return createSdkMcpServer({
-            name: 'clawwarden-local',
+            name: 'vibewarden-local',
             version: '1.0.0',
             tools: [{
-                name: 'clawwarden_update',
+                name: 'vibewarden_update',
                 description: 'Update task status and lane.',
                 inputSchema: {
                     status: z.enum(['idle', 'running', 'completed', 'failed', 'pending-dev', 'pending-merge', 'awaiting-review']),
@@ -543,7 +543,7 @@ ${history.substring(Math.max(0, history.length - 10000))}
                     return { content: [{ type: 'text', text: `Updated to ${status}` }] };
                 }
             }, {
-                name: 'clawwarden_create_task',
+                name: 'vibewarden_create_task',
                 description: 'Create a new task card on the kanban board. Use this when you discover additional work needed, bugs to fix, refactoring opportunities, or follow-up tasks during execution.',
                 inputSchema: {
                     title: z.string().describe('Task title - concise and actionable'),

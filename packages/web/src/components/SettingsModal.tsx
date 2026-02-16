@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
-import type { GlobalSettings, ClaudeSettings, NotificationSettings } from '@clawwarden/shared';
-import { DEFAULT_SETTINGS, DEFAULT_LANES } from '@clawwarden/shared';
+import type { GlobalSettings, ClaudeSettings, NotificationSettings } from '@vibewarden/shared';
+import { DEFAULT_SETTINGS, DEFAULT_LANES } from '@vibewarden/shared';
 import { fetchSettings, updateSettings } from '../api/settings';
 
 interface SettingsModalProps {

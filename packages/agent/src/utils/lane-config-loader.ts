@@ -1,12 +1,12 @@
 import { promises } from 'node:fs';
 import path from 'node:path';
-import { getLaneConfig, DEFAULT_LANE_CONFIGS } from '@clawwarden/shared';
-import type { LaneConfig, LaneActionConfig } from '@clawwarden/shared';
+import { getLaneConfig, DEFAULT_LANE_CONFIGS } from '@vibewarden/shared';
+import type { LaneConfig, LaneActionConfig } from '@vibewarden/shared';
 
 /**
  * 项目级配置文件路径（相对于项目根目录）
  */
-export const PROJECT_LANE_CONFIG_FILE = '.clawwarden/laneconfig.json';
+export const PROJECT_LANE_CONFIG_FILE = '.vibewarden/laneconfig.json';
 
 /**
  * 项目级配置接口
@@ -68,7 +68,7 @@ export async function generateProjectLaneConfig(
     projectPath: string
 ): Promise<void> {
     const config: ProjectLaneConfig = {
-        _comment: 'ClawWarden 泳道配置文件。在这里自定义你的 Agent 工作流。系统优先从此文件读取配置。\n\n' +
+        _comment: 'VibeWarden 泳道配置文件。在这里自定义你的 Agent 工作流。系统优先从此文件读取配置。\n\n' +
             '常用字段说明：\n' +
             '- primaryActions: 为该泳道定义的按钮操作。支持自定义 Prompt、工具和模型。\n' +
             '- promptSource: "user" (用户 Prompt), "plan-doc" (基于 .md 计划), "lane-only" (仅系统 Prompt)\n' +

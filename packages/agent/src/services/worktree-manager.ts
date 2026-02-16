@@ -83,9 +83,9 @@ export class WorktreeManager {
             console.log('[WorktreeManager] Repository is empty, creating initial commit...');
             // Create a .gitignore file if it doesn't exist
             try {
-                await execAsync('test -f .gitignore || echo "node_modules/\n.clawwarden/\n.worktrees/\n.claude/" > .gitignore', { cwd: projectPath });
+                await execAsync('test -f .gitignore || echo "node_modules/\n.vibewarden/\n.worktrees/\n.claude/" > .gitignore', { cwd: projectPath });
                 await execAsync('git add -A', { cwd: projectPath });
-                await execAsync('git commit --allow-empty -m "Initial commit by ClawWarden"', { cwd: projectPath });
+                await execAsync('git commit --allow-empty -m "Initial commit by VibeWarden"', { cwd: projectPath });
                 console.log('[WorktreeManager] Initial commit created');
             } catch (error: any) {
                 console.error('[WorktreeManager] Failed to create initial commit:', error.message);
@@ -227,7 +227,7 @@ export class WorktreeManager {
         }
 
         // Note: We do NOT delete the conversation history here
-        // Conversation history is stored in {projectPath}/.clawwarden/sessions/
+        // Conversation history is stored in {projectPath}/.vibewarden/sessions/
         // and should be preserved even after worktree is removed
     }
 
@@ -253,7 +253,7 @@ export class WorktreeManager {
                     if (statusOutput.trim()) {
                         console.log(`[WorktreeManager] Found uncommitted changes, committing...`);
                         await execAsync('git add -A', { cwd: worktreePath });
-                        await execAsync('git commit -m "Task completed - auto commit by ClawWarden"', { cwd: worktreePath });
+                        await execAsync('git commit -m "Task completed - auto commit by VibeWarden"', { cwd: worktreePath });
                         console.log(`[WorktreeManager] Changes committed successfully`);
                     } else {
                         console.log(`[WorktreeManager] No uncommitted changes in worktree`);

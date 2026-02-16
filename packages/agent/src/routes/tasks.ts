@@ -7,7 +7,7 @@ import path from 'path';
 import { readGlobalConfig, readProjectData, writeProjectData, readTaskSummary } from '../utils/json-store';
 import { worktreeManager } from '../services/worktree-manager';
 import { conversationStorage } from '../services/conversation-storage';
-import type { Task } from '@clawwarden/shared';
+import type { Task } from '@vibewarden/shared';
 
 const execAsync = promisify(exec);
 

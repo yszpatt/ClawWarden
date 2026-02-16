@@ -5,7 +5,7 @@
  * and routes messages to subscribed task handlers.
  */
 
-import type { ToolCall } from '@clawwarden/shared';
+import type { ToolCall } from '@vibewarden/shared';
 
 export interface WsMessage {
     type: string;

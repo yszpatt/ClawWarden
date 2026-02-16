@@ -1,6 +1,6 @@
 # CHANGELOG
 
-This document records the major milestones and technical updates of the ClawWarden project.
+This document records the major milestones and technical updates of the VibeWarden project.
 
 ---
 
@@ -125,7 +125,7 @@ This document records the major milestones and technical updates of the ClawWard
 ---
 
 ## [2026-02-02] - Branding & Architecture
-- **Branding**: Officially renamed to **ClawWarden** (Claw for Claude Code, Warden for monitoring).
+- **Branding**: Officially renamed to **VibeWarden** (Claw for Claude Code, Warden for monitoring).
 - **Worktree Isolation**: Established independent Git Worktrees for each task to prevent file locks and environment pollution during concurrent execution.
 
 ---

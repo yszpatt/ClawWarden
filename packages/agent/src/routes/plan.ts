@@ -20,7 +20,7 @@ export async function planRoutes(fastify: FastifyInstance) {
             throw { statusCode: 404, message: 'Plan document not found' };
         }
 
-        // Plan files are now stored in project directory: {projectPath}/.clawwarden/plans/
+        // Plan files are now stored in project directory: {projectPath}/.vibewarden/plans/
         const planFullPath = path.join(project.path, task.planPath);
         const content = await fs.readFile(planFullPath, 'utf-8');
 
@@ -45,12 +45,12 @@ export async function planRoutes(fastify: FastifyInstance) {
 
         if (!task.planPath) {
             // Create planPath if it doesn't exist
-            const plansDir = path.join(project.path, '.clawwarden', 'plans');
+            const plansDir = path.join(project.path, '.vibewarden', 'plans');
             await fs.mkdir(plansDir, { recursive: true });
-            task.planPath = `.clawwarden/plans/${request.params.taskId}-plan.md`;
+            task.planPath = `.vibewarden/plans/${request.params.taskId}-plan.md`;
         }
 
-        // Plan files are now stored in project directory: {projectPath}/.clawwarden/plans/
+        // Plan files are now stored in project directory: {projectPath}/.vibewarden/plans/
         const planFullPath = path.join(project.path, task.planPath);
         await fs.writeFile(planFullPath, request.body.content, 'utf-8');
 

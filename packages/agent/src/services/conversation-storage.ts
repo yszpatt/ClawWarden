@@ -1,24 +1,24 @@
 import fs from 'fs/promises';
 import path from 'path';
-import type { Conversation, ConversationMessage } from '@clawwarden/shared';
+import type { Conversation, ConversationMessage } from '@vibewarden/shared';
 
 /**
  * File-based conversation storage
- * Stores conversations at {projectPath}/.clawwarden/sessions/{taskId}.json
+ * Stores conversations at {projectPath}/.vibewarden/sessions/{taskId}.json
  */
 export class ConversationStorage {
     /**
      * Get session file path for a task in a project
      */
     getSessionPath(projectPath: string, taskId: string): string {
-        return path.join(projectPath, '.clawwarden', 'sessions', `${taskId}.json`);
+        return path.join(projectPath, '.vibewarden', 'sessions', `${taskId}.json`);
     }
 
     /**
      * Get sessions directory for a project
      */
     getSessionsDir(projectPath: string): string {
-        return path.join(projectPath, '.clawwarden', 'sessions');
+        return path.join(projectPath, '.vibewarden', 'sessions');
     }
 
     /**

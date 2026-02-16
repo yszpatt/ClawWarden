@@ -8,7 +8,7 @@ export function Logo({ className = '', size = 32 }: { className?: string; size?:
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
             className={className}
-            aria-label="ClawWarden Logo"
+            aria-label="VibeWarden Logo"
         >
             {/* The Warden: A sturdy shield/hexagon container representing security and monitoring */}
             <path

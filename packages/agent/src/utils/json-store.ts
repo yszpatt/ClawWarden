@@ -1,8 +1,8 @@
 import { readFile, writeFile, mkdir, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import { dirname } from 'path';
-import type { GlobalConfig, ProjectData } from '@clawwarden/shared';
-import { DEFAULT_LANES, DEFAULT_SETTINGS } from '@clawwarden/shared';
+import type { GlobalConfig, ProjectData } from '@vibewarden/shared';
+import { DEFAULT_LANES, DEFAULT_SETTINGS } from '@vibewarden/shared';
 import { GLOBAL_CONFIG_FILE, getProjectTasksFile } from './paths';
 import { fileWatcher } from '../services/file-watcher';
 

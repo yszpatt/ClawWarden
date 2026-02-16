@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import type { Task, StructuredOutput } from '@clawwarden/shared';
+import type { Task, StructuredOutput } from '@vibewarden/shared';
 import { useTerminalConnection } from './Terminal';
 import { ConversationPanel } from './conversation/ConversationPanel';
 import { TaskInfoPanel } from './TaskInfoPanel';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { StructuredOutput, PlanOutput, DevelopmentOutput, TestingOutput } from '@clawwarden/shared';
+import type { StructuredOutput, PlanOutput, DevelopmentOutput, TestingOutput } from '@vibewarden/shared';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 

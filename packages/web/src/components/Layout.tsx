@@ -23,7 +23,7 @@ export function Header({ projectName, onBackToProjects, onSettingsClick }: Heade
                 )}
                 <div className="header-brand">
                     <Logo size={28} />
-                    <h1>ClawWarden</h1>
+                    <h1>VibeWarden</h1>
                 </div>
             </div>
             <div className="header-actions">

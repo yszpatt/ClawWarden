@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Wrench } from 'lucide-react';
-import type { ConversationMessage, AssistantMessage } from '@clawwarden/shared';
+import type { ConversationMessage, AssistantMessage } from '@vibewarden/shared';
 import { MessageBubble } from './MessageBubble';
 
 interface MessageListProps {

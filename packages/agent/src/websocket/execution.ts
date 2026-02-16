@@ -9,8 +9,8 @@ import { worktreeManager } from '../services/worktree-manager';
 import { conversationStorage } from '../services/conversation-storage';
 import { getSchemaForLane, getOutputTypeForLane } from '../services/schemas';
 import { getMergedLaneConfig } from '../utils/lane-config-loader';
-import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task, ToolCall, AssistantMessage, LaneActionConfig } from '@clawwarden/shared';
-import { getLanePrompt, getLaneConfig } from '@clawwarden/shared';
+import type { TaskStatus, Lane, ProjectData, StructuredOutput, ConversationWsMessage, ConversationMessage, Task, ToolCall, AssistantMessage, LaneActionConfig } from '@vibewarden/shared';
+import { getLanePrompt, getLaneConfig } from '@vibewarden/shared';
 import { fileWatcher, FileChangeEvent } from '../services/file-watcher';
 
 interface ExecutionClient {
@@ -288,7 +288,7 @@ async function handleLaneAction(
                 let planRef = task.planPath;
                 if (task.worktree?.path) {
                     const planFileName = task.planPath.split('/').pop();
-                    planRef = `../../.clawwarden / plans / ${planFileName} `;
+                    planRef = `../../.vibewarden / plans / ${planFileName} `;
                 }
                 prompt = `${baseSystemPrompt} \n\n请按照 @${planRef} 中的计划方案执行任务。`;
             } else {
@@ -523,7 +523,7 @@ async function handleLaneAction(
 
             if (laneConfig.generatesPlan) {
                 if (isFinishedSuccessfully) {
-                    const plansDir = path.join(project.path, '.clawwarden', 'plans');
+                    const plansDir = path.join(project.path, '.vibewarden', 'plans');
                     await fs.mkdir(plansDir, { recursive: true });
                     const planFileName = `${task.id}-plan.md`;
 
@@ -546,7 +546,7 @@ async function handleLaneAction(
                     }
 
                     await fs.writeFile(path.join(plansDir, planFileName), planContent, 'utf-8');
-                    finalPlanPath = `.clawwarden/plans/${planFileName}`;
+                    finalPlanPath = `.vibewarden/plans/${planFileName}`;
 
                     if (connection.socket.readyState === 1) {
                         connection.socket.send(JSON.stringify({

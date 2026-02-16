@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { readdir, stat } from 'fs/promises';
 import { join, isAbsolute } from 'path';
 import { homedir } from 'os';
-import type { FsListResponse, FsItem } from '@clawwarden/shared';
+import type { FsListResponse, FsItem } from '@vibewarden/shared';
 
 export async function fsRoutes(fastify: FastifyInstance) {
     fastify.get<{

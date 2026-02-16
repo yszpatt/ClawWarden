@@ -1,4 +1,4 @@
-import type { GlobalSettings } from '@clawwarden/shared';
+import type { GlobalSettings } from '@vibewarden/shared';
 
 const API_BASE = 'http://localhost:4001';
 
