@@ -4,6 +4,19 @@ This document records the major milestones and technical updates of the ClawWard
 
 ---
 
+## [2026-02-16] - Visual Polish & Light Mode Optimization
+
+### 🎨 UI Refinement & UX Improvements
+- **Light Mode Fine-tuning**:
+    - Removed redundant gradients from large task titles (`task-title-large`), improving text legibility in light mode.
+    - Updated task title backgrounds to a cleaner, more aesthetically pleasing color palette.
+- **Project Selector Enhancements**:
+    - Refined the background texture and spacing of project cards for a more modern and breathable layout.
+- **Core Action Button Styling**:
+    - Improved the visibility and definition of primary action buttons in high-brightness environments, fixing the "washed-out" appearance and enhancing interactive affordance.
+
+---
+
 ## [2026-02-15] - Interaction Enhancement & Visual Overhaul
 
 ### Workflow & Interaction Optimization
