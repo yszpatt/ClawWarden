@@ -13,6 +13,10 @@ This document records the major milestones and technical updates of the VibeWard
     - **Enhanced Interaction**: Added `Cmd+Enter` (Mac) / `Ctrl+Enter` (Windows) shortcut for quick task submission and auto-focus on title input.
     - **Prompt Input**: Increased the height of the Claude Prompt input area for better editing of long instructions.
     - **Light Mode Support**: Ensured full compatibility with Light Mode using CSS variables.
+- **Comprehensive Light Mode Polish**:
+    - **Prompt Area**: Optimized background colors to use soft off-white tones (Slate 50/100) instead of harsh pure white or muddy gray.
+    - **Conversation & Tools**: Fixed dark backgrounds on Tool IO blocks and Code Blocks in light mode, now using context-aware light themes.
+    - **Scrollbars**: Improved scrollbar visibility in light mode for the Kanban board and other panels.
 
 ### ⚙️ System Configuration & Stability
 - **Dynamic Port Assignment**:

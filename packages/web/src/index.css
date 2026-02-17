@@ -83,6 +83,17 @@
   --pill-bg: rgba(255, 255, 255, 0.02);
   --status-badge-bg: rgba(255, 255, 255, 0.05);
   --panel-header-bg: linear-gradient(to bottom, var(--bg-secondary), transparent);
+  --panel-header-bg: linear-gradient(to bottom, var(--bg-secondary), transparent);
+
+  /* Prompt Card Colors */
+  --prompt-header-bg: rgba(255, 255, 255, 0.03);
+  --prompt-content-bg: rgba(0, 0, 0, 0.2);
+
+  /* Tool & Code Colors */
+  --tool-io-bg: rgba(0, 0, 0, 0.2);
+  --code-block-bg: #0b1120;
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
 }
 
 .light-theme {
@@ -128,7 +139,18 @@
   --icon-box-bg: #f1f5f9;
   --pill-bg: #f1f5f9;
   --status-badge-bg: #f1f5f9;
+  --status-badge-bg: #f1f5f9;
   --panel-header-bg: var(--bg-secondary);
+
+  /* Prompt Card Colors - Light Mode Optim */
+  --prompt-header-bg: #f1f5f9;
+  --prompt-content-bg: #f8fafc;
+
+  /* Tool & Code Colors - Light Mode Optim */
+  --tool-io-bg: #f1f5f9;
+  --code-block-bg: #f8fafc;
+  --scrollbar-thumb: rgba(0, 0, 0, 0.1);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
 }
 
 * {
@@ -1701,14 +1723,13 @@ body::before {
 }
 
 .kanban-board::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--scrollbar-thumb);
   border-radius: 4px;
   cursor: pointer;
 }
 
 .kanban-board::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-
+  background-color: var(--scrollbar-thumb-hover);
 }
 
 .kanban-lane {
@@ -1820,7 +1841,7 @@ body::before {
 }
 
 .code-block-premium {
-  background: #0b1120 !important;
+  background: var(--code-block-bg) !important;
   padding: 1.25rem;
   border-radius: 8px;
   font-family: 'JetBrains Mono', monospace !important;
@@ -1995,7 +2016,7 @@ body::before {
   margin-top: 0.25rem;
   white-space: pre-wrap;
   word-break: break-word;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--tool-io-bg);
   padding: 0.25rem;
   border-radius: 4px;
 }
@@ -2709,7 +2730,9 @@ body::before {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  background: rgba(255, 255, 255, 0.03);
+  padding: 0.75rem 1rem;
+  background: var(--prompt-header-bg);
+  border-bottom: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
   font-size: 0.75rem;
   font-weight: 600;
@@ -2731,8 +2754,10 @@ body::before {
   flex: 1;
   /* Fill remaining card space */
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.2);
+  overflow-y: auto;
+  background: var(--prompt-content-bg);
 }
+
 
 /* Ensure sections don't shrink too much */
 .section-block {
