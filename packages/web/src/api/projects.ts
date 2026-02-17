@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:4001';
+const API_BASE = `http://localhost:${__BACKEND_PORT__}`;
 
 async function fetchWithRetry<T>(
     url: string,

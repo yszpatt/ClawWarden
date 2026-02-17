@@ -22,7 +22,7 @@ export interface GlobalSettings {
 }
 
 export const DEFAULT_SETTINGS: GlobalSettings = {
-    agentPort: 8888,
+    agentPort: 6172,
     theme: 'dark',
     claude: {
         cliPath: 'claude',

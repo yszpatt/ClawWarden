@@ -215,7 +215,7 @@ export function TaskInfoPanel({
     };
 
     return (
-        <div className="task-info-panel">
+        <div className={`task-info-panel ${isEditing ? 'premium-edit-mode' : ''}`}>
             {/* Header Section */}
             <div className="panel-header-modern">
                 <div className="header-top">
@@ -242,7 +242,7 @@ export function TaskInfoPanel({
                             </>
                         ) : (
                             <>
-                                <button className="btn-save-mini" onClick={handleSave}>
+                                <button className="btn-save-premium" onClick={handleSave}>
                                     <Save size={14} /> Save
                                 </button>
                                 <button className="icon-btn-ghost" onClick={() => setIsEditing(false)}>
@@ -254,12 +254,13 @@ export function TaskInfoPanel({
                 </div>
 
                 {isEditing ? (
-                    <div className="edit-form-group">
+                    <div className="edit-form-group-premium">
                         <input
-                            className="title-input-large"
+                            className="premium-title-input"
                             value={editForm.title}
                             onChange={e => setEditForm({ ...editForm, title: e.target.value })}
                             placeholder="Task Title"
+                            autoFocus
                         />
                     </div>
                 ) : (
@@ -290,10 +291,10 @@ export function TaskInfoPanel({
                 <div className="section-block">
                     {isEditing ? (
                         <textarea
-                            className="desc-textarea"
+                            className="premium-textarea desc-textarea-premium"
                             value={editForm.description}
                             onChange={e => setEditForm({ ...editForm, description: e.target.value })}
-                            placeholder="Task Description"
+                            placeholder="What needs to be done?"
                         />
                     ) : (
                         <p className="task-desc-text">{task.description}</p>
@@ -303,14 +304,16 @@ export function TaskInfoPanel({
                 {/* Technical Context (Prompt) */}
                 <div className="section-block prompt-section-block">
                     {isEditing ? (
-                        <div className="form-group">
-                            <label className="form-label">Prompt</label>
+                        <div className="prompt-card editing">
+                            <div className="prompt-header">
+                                <Terminal size={14} className="accent-icon" />
+                                <span>Prompt</span>
+                            </div>
                             <textarea
-                                className="code-textarea"
+                                className="premium-textarea code-textarea-premium"
                                 value={editForm.prompt}
                                 onChange={e => setEditForm({ ...editForm, prompt: e.target.value })}
-                                placeholder="Enter system prompt instructions..."
-                                style={{ minHeight: '120px' }}
+                                placeholder="Enter specific instructions for Claude..."
                             />
                         </div>
                     ) : (

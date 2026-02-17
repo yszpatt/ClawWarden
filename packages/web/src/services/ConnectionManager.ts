@@ -60,7 +60,7 @@ export class ConnectionManager {
         this.isConnecting = true;
         console.log('[ConnectionManager] Connecting to WebSocket...');
 
-        const ws = new WebSocket('ws://localhost:4001/ws/execute');
+        const ws = new WebSocket(`ws://localhost:${__BACKEND_PORT__}/ws/execute`);
 
         ws.onopen = () => {
             console.log('[ConnectionManager] WebSocket connected');

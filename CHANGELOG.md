@@ -4,6 +4,18 @@ This document records the major milestones and technical updates of the VibeWard
 
 ---
 
+## [2026-02-17] - Backend Port Configuration Flexibility
+
+### ⚙️ System Configuration & Stability
+- **Dynamic Port Assignment**:
+    - Migrated the default backend port from `4001` to `6172` to avoid common port conflicts.
+    - Implemented dynamic port loading from the user's home directory configuration file (`~/.vibewarden/config.json`).
+    - Added support for overriding the port via the `PORT` environment variable, enhancing deployment flexibility.
+- **Configuration Standardization**: Standardized the use of `settings.agentPort` for port configuration and updated default values in `packages/shared`.
+- **Full-stack Configuration Sync**: The Web frontend now automatically detects and connects to the configured backend port during both build and development phases, eliminating manual API URL adjustments.
+
+
+
 ## [2026-02-16] - Visual Polish & Light Mode Optimization
 
 ### 🎨 UI Refinement & UX Improvements

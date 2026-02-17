@@ -2266,7 +2266,8 @@ body::before {
   color: #EF4444;
 }
 
-.btn-save-mini {
+.btn-save-mini,
+.btn-save-premium {
   display: flex;
   align-items: center;
   gap: 0.25rem;
@@ -2277,6 +2278,12 @@ body::before {
   border-radius: 4px;
   font-size: 0.75rem;
   cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-save-premium:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 .task-title-large {
@@ -2296,6 +2303,108 @@ body::before {
 /* Ensure gradient text still works in dark mode if we use a gradient */
 :root:not(.light-theme) .task-title-large {
   -webkit-text-fill-color: transparent;
+}
+
+/* Premium Edit Mode Enhancements */
+.premium-edit-mode .panel-header-modern {
+  border-bottom: 1px solid var(--accent-glow);
+  background: linear-gradient(to bottom, rgba(99, 102, 241, 0.05), transparent);
+}
+
+.edit-form-group-premium {
+  margin-top: 1rem;
+}
+
+.edit-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+  margin-bottom: 0.5rem;
+}
+
+.premium-title-input {
+  width: 100%;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.875rem 1.25rem;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.premium-title-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--bg-tertiary);
+  box-shadow: 0 0 0 3px var(--accent-glow), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.premium-textarea {
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  resize: vertical;
+  transition: all 0.2s ease;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.premium-textarea:focus {
+  outline: none;
+  border-color: var(--accent-light);
+  background: var(--bg-tertiary);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.desc-textarea-premium {
+  min-height: 120px;
+}
+
+.prompt-card.editing {
+  border-color: var(--accent-glow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* Match the flex behavior of prompt-card */
+}
+
+.prompt-card.editing .premium-textarea {
+  flex: 1;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 1rem;
+  box-shadow: none;
+  min-height: 200px;
+  /* Set a default height when editing */
+}
+
+.prompt-card.editing .premium-textarea:focus {
+  background: rgba(255, 255, 255, 0.02);
+  box-shadow: none;
+}
+
+.code-textarea-premium {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .title-input-large {
