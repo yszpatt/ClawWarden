@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Zap, Activity, FileText, Terminal } from 'lucide-react';
 
 interface TaskFormProps {
@@ -13,37 +13,65 @@ export function TaskForm({ onSubmit, onClose }: TaskFormProps) {
     const [autoExecute, setAutoExecute] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
+    // Auto-focus title on mount
+    const titleInputRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        if (titleInputRef.current) {
+            titleInputRef.current.focus();
+        }
+    }, []);
+
     const handleSubmit = async () => {
-        if (!title.trim()) return;
+        if (!title.trim() || submitting) return;
         setSubmitting(true);
-        await onSubmit({ title: title.trim(), description: description.trim(), prompt: prompt.trim(), autoExecute });
-        setSubmitting(false);
+        try {
+            await onSubmit({ title: title.trim(), description: description.trim(), prompt: prompt.trim(), autoExecute });
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            e.preventDefault();
+            handleSubmit();
+        }
+
+        if (e.key === 'Escape') {
+            onClose();
+        }
     };
 
     return (
         <div className="modal-overlay" onClick={onClose}>
-            <div className="modal-content bento-module" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', padding: '2rem' }}>
-                <h2 style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-                    <Zap size={24} className="accent-text" fill="var(--accent)" />
+            <div
+                className="modal-content bento-module"
+                onClick={(e) => e.stopPropagation()}
+                style={{ maxWidth: '550px', width: '100%', padding: '1.5rem' }}
+            >
+                <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem' }}>
+                    <Zap size={20} className="accent-text" style={{ color: 'var(--accent)' }} />
                     创建新任务
                 </h2>
 
-                <div className="edit-section-premium" style={{ marginBottom: '1.5rem' }}>
-                    <div className="edit-section-header">
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                    <div className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
                         <Activity size={12} /> 标题
                     </div>
                     <input
+                        ref={titleInputRef}
                         type="text"
-                        className="premium-textarea"
+                        className="premium-title-input"
                         placeholder="任务标题..."
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        style={{ fontSize: '1.1rem', fontWeight: 600 }}
+                        onKeyDown={handleKeyDown}
+                        style={{ padding: '0.6rem 0.8rem', fontSize: '1rem', marginBottom: '0' }}
                     />
                 </div>
 
-                <div className="edit-section-premium" style={{ marginBottom: '1.5rem' }}>
-                    <div className="edit-section-header">
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                    <div className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
                         <FileText size={12} /> 描述
                     </div>
                     <textarea
@@ -51,40 +79,45 @@ export function TaskForm({ onSubmit, onClose }: TaskFormProps) {
                         placeholder="简单描述一下这个任务..."
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        style={{ minHeight: '80px' }}
+                        onKeyDown={handleKeyDown}
+                        style={{ minHeight: '60px', padding: '0.6rem 0.8rem', fontSize: '0.9rem' }}
                     />
                 </div>
 
-                <div className="edit-section-premium" style={{ marginBottom: '1.5rem' }}>
-                    <div className="edit-section-header">
+                <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                    <div className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '0.25rem' }}>
                         <Terminal size={12} /> Claude Prompt
                     </div>
-                    <textarea
-                        className="premium-textarea code-textarea-premium"
-                        placeholder="Claude 执行此任务时使用的具体指令..."
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        style={{ minHeight: '120px' }}
-                    />
+                    <div className="prompt-card editing" style={{ minHeight: 'auto' }}>
+                        <textarea
+                            className="premium-textarea code-textarea-premium"
+                            placeholder="Claude 执行此任务时使用的具体指令..."
+                            value={prompt}
+                            onChange={(e) => setPrompt(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            style={{ minHeight: '160px', padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}
+                        />
+                    </div>
                 </div>
 
-                <div className="form-group" style={{ marginTop: '1rem' }}>
+                <div className="form-group" style={{ marginTop: '1rem', marginBottom: '1.25rem' }}>
                     <div
                         className={`auto-execute-toggle-premium ${autoExecute ? 'active' : ''}`}
                         onClick={() => setAutoExecute(!autoExecute)}
-                        style={{ background: 'rgba(255,255,255,0.02)' }}
+                        style={{ padding: '0.75rem' }}
                     >
-                        <div className="toggle-icon">
-                            <Zap size={16} fill={autoExecute ? 'currentColor' : 'none'} />
+                        <div className="toggle-icon" style={{ width: '32px', height: '32px' }}>
+                            <Zap size={16} />
                         </div>
                         <div className="toggle-info">
-                            <div className="toggle-title">
+                            <div className="toggle-title" style={{ fontSize: '0.875rem' }}>
                                 自动执行模式
                             </div>
-                            <div className="toggle-desc">
+                            <div className="toggle-desc" style={{ fontSize: '0.7rem' }}>
                                 任务完成后自动进入下一阶段
                             </div>
                         </div>
+                        {/* Hidden checkbox for semantic purpose */}
                         <input
                             type="checkbox"
                             checked={autoExecute}
@@ -94,19 +127,20 @@ export function TaskForm({ onSubmit, onClose }: TaskFormProps) {
                     </div>
                 </div>
 
-                <div className="modal-actions" style={{ marginTop: '2rem' }}>
-                    <button className="secondary-btn" onClick={onClose} style={{ borderRadius: '10px' }}>
+                <div className="modal-actions" style={{ marginTop: '0' }}>
+                    <button className="btn-unified ghost" onClick={onClose} style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}>
                         取消
                     </button>
                     <button
-                        className="btn-primary"
+                        className="btn-unified primary"
                         onClick={handleSubmit}
                         disabled={submitting || !title.trim()}
-                        style={{ borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                        title="按 Cmd+Enter 快速提交"
+                        style={{ padding: '0.5rem 1.25rem', fontSize: '0.85rem' }}
                     >
                         {submitting ? '创建中...' : (
                             <>
-                                <Zap size={16} fill="white" />
+                                <Zap size={14} />
                                 创建任务
                             </>
                         )}

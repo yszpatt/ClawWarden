@@ -4,7 +4,15 @@ This document records the major milestones and technical updates of the VibeWard
 
 ---
 
-## [2026-02-17] - Backend Port Configuration Flexibility
+## [2026-02-17] - Backend Port Configuration Flexibility & Create Task Page Optimization
+
+### 🎨 UI & UX Improvements
+- **Create Task Page Overhaul**:
+    - **Premium Visuals**: Refactored the Create Task modal to align with the "Premium Dark Mode" aesthetic, using global CSS classes for consistent styling.
+    - **Compact Layout**: optimized the layout to be more compact, reducing padding and margins for a cleaner look.
+    - **Enhanced Interaction**: Added `Cmd+Enter` (Mac) / `Ctrl+Enter` (Windows) shortcut for quick task submission and auto-focus on title input.
+    - **Prompt Input**: Increased the height of the Claude Prompt input area for better editing of long instructions.
+    - **Light Mode Support**: Ensured full compatibility with Light Mode using CSS variables.
 
 ### ⚙️ System Configuration & Stability
 - **Dynamic Port Assignment**:
