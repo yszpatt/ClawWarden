@@ -11,11 +11,11 @@ import type { ProjectRef } from '@vibewarden/shared';
 const execAsync = promisify(exec);
 
 /**
- * Check if a directory is a git repository
+ * Check if a directory is inside a git repository
  */
-async function isGitRepo(projectPath: string): Promise<boolean> {
+async function isInsideGitRepo(projectPath: string): Promise<boolean> {
     try {
-        await execAsync('git rev-parse --git-dir', { cwd: projectPath });
+        await execAsync('git rev-parse --is-inside-work-tree', { cwd: projectPath });
         return true;
     } catch {
         return false;
@@ -23,21 +23,72 @@ async function isGitRepo(projectPath: string): Promise<boolean> {
 }
 
 /**
- * Ensure the project directory is a git repository
- * If not, initialize it
+ * Check if a directory is the root of a git repository
+ */
+async function isGitRoot(projectPath: string): Promise<boolean> {
+    try {
+        const { stdout } = await execAsync('git rev-parse --show-toplevel', { cwd: projectPath });
+        // Normalize paths for comparison
+        const toplevel = fs.realpathSync(stdout.trim());
+        const current = fs.realpathSync(projectPath);
+        return toplevel === current;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Ensure the project directory is a git repository or inside one
+ * If not tracked at all, initialize it
  */
 async function ensureGitRepo(projectPath: string): Promise<void> {
-    const isGit = await isGitRepo(projectPath);
-    if (!isGit) {
-        console.log('[Project] Initializing git repository in:', projectPath);
+    const isInside = await isInsideGitRepo(projectPath);
+
+    if (!isInside) {
+        console.log('[Project] Directory not tracked by Git. Initializing new repository in:', projectPath);
         await execAsync('git init', { cwd: projectPath });
-        // Create initial commit with .gitignore
-        await execAsync('echo "node_modules/\\n.vibewarden/\\n.worktrees/\\n.claude/" > .gitignore', { cwd: projectPath });
+
+        // Create initial .gitignore if it doesn't exist
+        const gitignorePath = join(projectPath, '.gitignore');
+        const defaultIgnore = 'node_modules/\n.vibewarden/\n.worktrees/\n.claude/\n';
+
+        if (!fs.existsSync(gitignorePath)) {
+            await fs.promises.writeFile(gitignorePath, defaultIgnore);
+        } else {
+            const content = await fs.promises.readFile(gitignorePath, 'utf-8');
+            if (!content.includes('.vibewarden/')) {
+                await fs.promises.appendFile(gitignorePath, '\n# VibeWarden\n.vibewarden/\n.worktrees/\n.claude/\n');
+            }
+        }
+
         await execAsync('git add .gitignore', { cwd: projectPath });
+        // Check if there are other files to add for initial commit
+        const { stdout: status } = await execAsync('git status --porcelain', { cwd: projectPath });
+        if (status.trim()) {
+            await execAsync('git add .', { cwd: projectPath });
+        }
+
         await execAsync('git commit -m "Initial commit by VibeWarden"', { cwd: projectPath });
         console.log('[Project] Git repository initialized with initial commit');
     } else {
-        console.log('[Project] Project is already a git repository');
+        const isRoot = await isGitRoot(projectPath);
+        if (isRoot) {
+            console.log('[Project] Project is a Git repository root');
+        } else {
+            console.log('[Project] Project is inside a Git repository (subfolder/monorepo)');
+        }
+
+        // Even if it's already a repo, ensure our critical files are ignored in the nearest .gitignore
+        // This is a bit tricky as the .gitignore might be in a parent dir.
+        // For now, we at least ensure the project-local .gitignore has them if it exists.
+        const gitignorePath = join(projectPath, '.gitignore');
+        if (fs.existsSync(gitignorePath)) {
+            const content = await fs.promises.readFile(gitignorePath, 'utf-8');
+            if (!content.includes('.vibewarden/')) {
+                await fs.promises.appendFile(gitignorePath, '\n# VibeWarden\n.vibewarden/\n.worktrees/\n.claude/\n');
+                console.log('[Project] Updated existing .gitignore with VibeWarden paths');
+            }
+        }
     }
 }
 
@@ -81,11 +132,12 @@ export async function projectRoutes(fastify: FastifyInstance) {
         if (!hasClawwarden && !hasClaude) {
             console.log('[Project] New project detected, initializing...');
             await initializeProject(path, project.id);
-            // Auto-initialize git if not already a git repo
-            await ensureGitRepo(path);
         } else {
             console.log('[Project] Existing project detected, importing...');
         }
+
+        // Always ensure git repo for all projects to guarantee worktree support
+        await ensureGitRepo(path);
 
         // Ensure lane config exists
         if (!fs.existsSync(join(path, PROJECT_LANE_CONFIG_FILE))) {

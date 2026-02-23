@@ -10,6 +10,7 @@ export interface WorktreeInfo {
     branch: string;
     createdAt: string;
     removedAt?: string;  // When worktree was deleted (for historical tracking)
+    relativePath?: string; // Relative path from repo root (for monorepo support)
 }
 
 export class WorktreeManager {
@@ -19,6 +20,18 @@ export class WorktreeManager {
     async isGitRepo(projectPath: string): Promise<boolean> {
         try {
             await execAsync('git rev-parse --git-dir', { cwd: projectPath });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Check if the project directory is tracked by git
+     */
+    async isTracked(projectPath: string): Promise<boolean> {
+        try {
+            await execAsync('git ls-files --error-unmatch .', { cwd: projectPath });
             return true;
         } catch {
             return false;
@@ -113,6 +126,15 @@ export class WorktreeManager {
         // Ensure repository has at least one commit
         await this.ensureHasCommit(projectPath);
 
+        // Detect project relative path within the repository
+        let relativePath = '';
+        try {
+            const { stdout } = await execAsync('git rev-parse --show-prefix', { cwd: projectPath });
+            relativePath = stdout.trim().replace(/\/$/, ''); // Remove trailing slash
+        } catch (e) {
+            console.warn('[WorktreeManager] Failed to detect relative path:', e);
+        }
+
         const defaultBranch = baseBranch || await this.getDefaultBranch(projectPath);
         const branchName = `task/${taskId}`;
         const worktreePath = join(projectPath, '.worktrees', taskId);
@@ -130,6 +152,7 @@ export class WorktreeManager {
                 path: worktreePath,
                 branch: branchName,
                 createdAt: new Date().toISOString(),
+                relativePath,
             };
         }
 
@@ -163,6 +186,32 @@ export class WorktreeManager {
         } catch (error: any) {
             console.error('[WorktreeManager] Failed to create worktree:', error.message);
             throw error;
+        }
+
+        // If in a monorepo (relativePath exists), setup sparse-checkout to isolate project
+        if (relativePath) {
+            const isTracked = await this.isTracked(projectPath);
+            if (isTracked) {
+                console.log(`[WorktreeManager] Setting up sparse-checkout for project at: ${relativePath}`);
+                try {
+                    await execAsync('git sparse-checkout init --cone', { cwd: worktreePath });
+                    await execAsync(`git sparse-checkout set "${relativePath}"`, { cwd: worktreePath });
+
+                    // Verify that the isolated directory actually exists
+                    const isolatedPath = join(worktreePath, relativePath);
+                    if (!existsSync(isolatedPath)) {
+                        console.warn(`[WorktreeManager] Sparse-checkout result path does not exist: ${isolatedPath}. Disabling sparse-checkout.`);
+                        await execAsync('git sparse-checkout disable', { cwd: worktreePath });
+                    } else {
+                        console.log('[WorktreeManager] Sparse-checkout initialized');
+                    }
+                } catch (sparseError: any) {
+                    console.warn('[WorktreeManager] Failed to setup sparse-checkout:', sparseError.message);
+                    // Non-fatal, but isolation will be incomplete
+                }
+            } else {
+                console.log('[WorktreeManager] Project is not tracked by git, skipping sparse-checkout isolation');
+            }
         }
 
         // Ensure .claude/ is in .gitignore inside the worktree
@@ -199,7 +248,7 @@ export class WorktreeManager {
         const agentDir = join(worktreePath, '.agent');
         if (existsSync(agentDir)) {
             try {
-                rm(agentDir, { recursive: true, force: true });
+                rmSync(agentDir, { recursive: true, force: true });
                 console.log('[WorktreeManager] Removed deprecated .agent directory from worktree');
             } catch (error: any) {
                 console.warn('[WorktreeManager] Failed to remove .agent directory:', error.message);
@@ -210,6 +259,7 @@ export class WorktreeManager {
             path: worktreePath,
             branch: branchName,
             createdAt: new Date().toISOString(),
+            relativePath,
         };
     }
 
@@ -371,8 +421,8 @@ export class WorktreeManager {
             for (const line of lines) {
                 if (line.startsWith('worktree ')) {
                     const path = line.replace('worktree ', '');
-                    // Skip the main worktree
-                    if (path !== projectPath) {
+                    // Skip the main worktree and ensure the worktree belongs to this project
+                    if (path !== projectPath && path.startsWith(projectPath)) {
                         worktrees.push(path);
                     }
                 }

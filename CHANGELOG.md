@@ -4,6 +4,24 @@ This document records the major milestones and technical updates of the VibeWard
 
 ---
 
+## [2026-02-23] - Git Worktree Isolation & Branding Consolidation
+
+### ⚙️ System Configuration & Stability
+- **Robust Git Worktree Isolation**:
+    - Enhanced `WorktreeManager` to detect and handle nested Git repository structures (e.g., home directory as Git root).
+    - Implemented a fallback mechanism to use physical directory isolation if `git worktree` commands fail due to untracked directory conflicts.
+    - Improved `execution.ts` to validate the physical existence of the working directory before task execution, preventing `spawn node ENOENT` errors.
+- **Git Tracking Detection**: Added logic to verify if a project directory is properly tracked by Git before performing worktree operations, ensuring compatibility with diverse repository configurations.
+
+### 🔧 Monorepo & Branding Consolidation
+- **VibeWarden Rebranding**: Completed the transition from *ClawWarden* to **VibeWarden** across the entire monorepo, including `package.json` updates, logo assets, and documentation.
+- **Asset Optimization**: Updated branding assets and optimized the layout for the new identity.
+
+### 📝 Documentation & README
+- **Multi-language Documentation**: Synchronized `README.md` with `README.zh-CN.md` and added updated screenshots for the new UI.
+
+---
+
 ## [2026-02-17] - Backend Port Configuration Flexibility & Create Task Page Optimization
 
 ### 🎨 UI & UX Improvements

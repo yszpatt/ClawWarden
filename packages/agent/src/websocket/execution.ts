@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { SocketStream } from '@fastify/websocket';
-import { promises as fs } from 'fs';
+import { promises as fs, existsSync } from 'fs';
 import path from 'path';
 import { v4 as uuid } from 'uuid';
 import { readGlobalConfig, readProjectData, writeProjectData, writeTaskSummary, patchTask, findTask } from '../utils/json-store';
@@ -218,7 +218,12 @@ async function handleLaneAction(
 
     const { project, task, data } = result;
     const projectPath = project.path;
-    const workingDir = task.worktree?.path || project.path;
+    const workingDirFull = (task.worktree?.path && task.worktree?.relativePath)
+        ? path.join(task.worktree.path, task.worktree.relativePath)
+        : (task.worktree?.path || project.path);
+
+    // Safety check: ensure the working directory exists physically
+    const workingDir = existsSync(workingDirFull) ? workingDirFull : (task.worktree?.path || project.path);
     const sessionId = task.claudeSession?.id;
 
     // Get merged lane configuration
@@ -288,7 +293,7 @@ async function handleLaneAction(
                 let planRef = task.planPath;
                 if (task.worktree?.path) {
                     const planFileName = task.planPath.split('/').pop();
-                    planRef = `../../.vibewarden / plans / ${planFileName} `;
+                    planRef = `../../.vibewarden/plans/${planFileName}`;
                 }
                 prompt = `${baseSystemPrompt} \n\n请按照 @${planRef} 中的计划方案执行任务。`;
             } else {
