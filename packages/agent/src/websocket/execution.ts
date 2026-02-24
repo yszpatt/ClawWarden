@@ -1000,6 +1000,17 @@ async function handleConversationUserMessage(connection: SocketStream, message: 
     const userMessage: ConversationMessage = { id: uuid(), role: 'user', content, timestamp: new Date().toISOString() };
     await conversationStorage.appendMessage(project.path, taskId, userMessage);
 
+    // Set task status to running so the UI reflects that the agent is working
+    await patchTask(taskId, { status: 'running' });
+    if (connection.socket.readyState === 1) {
+        connection.socket.send(JSON.stringify({
+            type: 'task_status',
+            taskId,
+            status: 'running',
+            laneId: task.laneId
+        }));
+    }
+
     const { groupId, chunkStartMsg } = createMessageGroup();
     chunkStartMsg.taskId = taskId;
     connection.socket.send(JSON.stringify(chunkStartMsg));
@@ -1116,7 +1127,27 @@ async function handleConversationUserMessage(connection: SocketStream, message: 
     };
 
     try {
-        await agentManager.sendUserMessage(taskId, workingDir, content, callbacks, task.claudeSession?.id, { laneId: task.laneId });
+        const laneConfig = await getMergedLaneConfig(task.laneId, project.path);
+        const allowedTools = laneConfig.allowedTools || ['Bash', 'Read', 'Edit', 'Glob', 'Grep', 'Find', 'Write', 'vibewarden_update', 'vibewarden_create_task'];
+
+        await agentManager.sendUserMessage(taskId, workingDir, content, callbacks, task.claudeSession?.id, {
+            laneId: task.laneId,
+            allowedTools
+        });
+
+        // After sending finishes, ensures we are in idle state if not explicitly stopped
+        const currentTask = await findTask(taskId);
+        if (currentTask?.task?.status === 'running') {
+            await patchTask(taskId, { status: 'idle' });
+            if (connection.socket.readyState === 1) {
+                connection.socket.send(JSON.stringify({
+                    type: 'task_status',
+                    taskId,
+                    status: 'idle',
+                    laneId: task.laneId
+                }));
+            }
+        }
     } catch (error: any) {
         connection.socket.send(JSON.stringify({ type: 'conversation.error', taskId, error: error.message }));
     }

@@ -342,7 +342,7 @@ export class AgentManager extends EventEmitter {
         const skipPermissions = this.globalConfig?.settings?.claude?.defaultArgs?.includes('--dangerously-skip-permissions');
 
         const queryOptions: Record<string, unknown> = {
-            allowedTools: options?.allowedTools || ['Read', 'Glob', 'Grep', 'Bash', 'vibewarden_update', 'vibewarden_create_task'],
+            allowedTools: options?.allowedTools || ['Bash', 'Read', 'Edit', 'Glob', 'Grep', 'Find', 'Write', 'vibewarden_update', 'vibewarden_create_task'],
             settingSources: ['project'],
             cwd: projectPath,
             mcpServers: { 'vibewarden-local': mcpServer },

@@ -4,6 +4,22 @@ This document records the major milestones and technical updates of the VibeWard
 
 ---
 
+## [2026-02-24] - Conversation Control & Button Consolidation
+
+### 🎨 UI/UX Improvements
+- **Send & Stop Button Consolidation**:
+    - Merged the standalone "Stop" button into the primary message input button.
+    - Implemented **Visual State Awareness**: The button now dynamically switches to a "Stop" icon (Square) with a red "Pulse" effect during execution, reverting to "Send" (Send) otherwise.
+- **Interactive Animations**: Added a global `pulse` keyframe animation to provide better visual feedback while the Agent is working.
+
+### ⚙️ System Logic & Stability
+- **Fixed Stop Responsiveness**:
+    - Resolved a critical bug where the message input's stop action was disconnected, preventing task interruption.
+    - Improved state synchronization: User input now immediately updates the task status to `running` on both frontend and backend.
+- **Workflow Completion Loop**: Enhanced `execution.ts` callbacks to ensure tasks triggered via direct conversation reliably revert to `idle` upon completion.
+
+---
+
 ## [2026-02-23] - Git Worktree Isolation & Branding Consolidation
 
 ### ⚙️ System Configuration & Stability

@@ -74,7 +74,7 @@ Start both the agent (backend) and the web dashboard in development mode:
 pnpm dev
 ```
 
-The web interface typically runs on `http://localhost:5173`, and the agent on `http://localhost:4001`.
+The web interface typically runs on `http://localhost:6173`, and the agent on `http://localhost:6172`.
 
 ---
 

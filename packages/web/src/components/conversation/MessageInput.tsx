@@ -53,30 +53,30 @@ export function MessageInput({
                     rows={1}
                 />
                 <div className="input-actions-right">
-                    <button
-                        onClick={handleSend}
-                        disabled={disabled || !input.trim()}
-                        className="btn-icon-primary"
-                        title="发送 (Enter)"
-                    >
-                        <Send size={16} />
-                    </button>
+                    {isStreaming ? (
+                        <button
+                            onClick={onStop}
+                            className="btn-icon-primary danger pulse"
+                            title="停止"
+                        >
+                            <Square size={16} fill="currentColor" />
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleSend}
+                            disabled={disabled || !input.trim()}
+                            className="btn-icon-primary"
+                            title="发送 (Enter)"
+                        >
+                            <Send size={16} />
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Bottom Actions Row */}
             <div className="input-bottom-actions">
                 <div className="left-actions">
-                    {isStreaming && (
-                        <button
-                            onClick={onStop}
-                            className="action-link-btn danger"
-                            title="停止"
-                        >
-                            <Square size={14} fill="currentColor" />
-                            <span>Stop</span>
-                        </button>
-                    )}
                 </div>
                 <div className="right-hint">
                     Enter 发送

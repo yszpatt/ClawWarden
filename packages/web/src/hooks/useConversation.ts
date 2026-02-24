@@ -202,6 +202,14 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
         });
     }, [taskId, isStreaming]);
 
+    const stop = useCallback(async () => {
+        connectionManager.send({
+            type: 'stop',
+            taskId,
+        });
+        setIsStreaming(false);
+    }, [taskId]);
+
     const clearMessages = useCallback(async () => {
         setMessages([]);
         await apiClearConversation(projectId, taskId);
@@ -211,6 +219,7 @@ export function useConversation({ taskId, projectId }: UseConversationOptions) {
         messages,
         isStreaming,
         sendMessage,
+        stop,
         clearMessages,
     };
 }

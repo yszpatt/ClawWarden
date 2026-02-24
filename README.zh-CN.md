@@ -81,7 +81,7 @@ VibeWarden 采用 Monorepo 结构，包含三个核心组件：
 pnpm dev
 ```
 
-Web 界面通常运行在 `http://localhost:5173`，Agent 运行在 `http://localhost:4001`。
+Web 界面通常运行在 `http://localhost:6173`，Agent 运行在 `http://localhost:6172`。
 
 ---
 
