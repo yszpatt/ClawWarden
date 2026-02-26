@@ -67,6 +67,17 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
                 agentName: 'architect',
                 model: 'opus',
             },
+            {
+                id: "taskcard",
+                name: "卡片生成测试",
+                buttonLabel: "卡片生成测试",
+                buttonIcon: "code",
+                systemPrompt: "分析项目中可进行优化的3个功能点，使用vibewarden_create_task工具，在测试泳道创建卡片，给出任务的标题、简单描述、任务提示词",
+                outputFormat: "json_schema",
+                agentName: "developer",
+                model: "opus",
+                requiresWorktree: true
+            }
         ],
 
         promptSource: 'user',
