@@ -71,7 +71,7 @@ export async function generateProjectLaneConfig(
         _comment: 'VibeWarden 泳道配置文件。在这里自定义你的 Agent 工作流。系统优先从此文件读取配置。\n\n' +
             '常用字段说明：\n' +
             '- primaryActions: 为该泳道定义的按钮操作。支持自定义 Prompt、工具和模型。\n' +
-            '- promptSource: "user" (用户 Prompt), "plan-doc" (基于 .md 计划), "lane-only" (仅系统 Prompt)\n' +
+            '- promptSource: 泳道级默认提示词来源，支持在 primaryActions 中按操作覆盖。可选值: "user" / "plan-doc" / "lane-only" / "custom"\n' +
             '- onCompleteLane: 任务执行成功后自动流转到的下一个泳道 ID\n' +
             '- allowedTools: 限制 Agent 可以使用的工具（如 ["Read", "Find"] 等）'
     };

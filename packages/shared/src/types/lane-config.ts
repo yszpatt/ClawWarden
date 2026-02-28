@@ -32,6 +32,12 @@ export interface LaneActionConfig {
     /** 系统提示词（优先级高于泳道级） */
     systemPrompt?: string;
 
+    /** 提示词来源（覆盖泳道级配置） */
+    promptSource?: PromptSource;
+
+    /** 自定义 Prompt 模板（当 promptSource 为 'custom' 时使用） */
+    customPromptTemplate?: string;
+
     /** 输出格式 */
     outputFormat?: OutputFormat;
 

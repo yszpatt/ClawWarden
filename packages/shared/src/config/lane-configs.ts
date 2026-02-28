@@ -8,6 +8,7 @@ const TASK_DECOMPOSE_ACTION: LaneActionConfig = {
     name: '任务拆解',
     buttonLabel: '任务拆解',
     buttonIcon: 'box',
+    promptSource: 'user',
     systemPrompt: `你是一位经验丰富的项目经理和技术负责人。你的任务是分析当前需求，将其拆解为可执行的子任务。
 
 ## 执行流程
@@ -34,6 +35,18 @@ const TASK_DECOMPOSE_ACTION: LaneActionConfig = {
     model: 'sonnet',
 };
 
+// ============================================================
+// 全局操作：直接执行（每个有操作按钮的泳道都会添加）
+// ============================================================
+const DIRECT_EXECUTE_ACTION: LaneActionConfig = {
+    id: 'direct-execute',
+    name: '直接执行',
+    buttonLabel: '直接执行',
+    buttonIcon: 'play',
+    promptSource: 'user',
+    // systemPrompt 故意留空，直接使用用户卡片中的 Prompt
+};
+
 /**
  * 默认泳道配置
  */
@@ -46,6 +59,7 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
         description: '需求分析与方案设计阶段',
 
         primaryActions: [
+            DIRECT_EXECUTE_ACTION,
             {
                 id: 'generate-plan',
                 name: '生成计划方案',
@@ -85,6 +99,7 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
 - 实施步骤要具备可操作性，开发者可以直接照做
 - 考虑向后兼容性和可维护性`,
                 outputFormat: 'json_schema',
+                promptSource: 'user',
                 agentName: 'planner',
                 model: 'opus',
             },
@@ -116,6 +131,7 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
 - 具体的修复 / 改进方案
 - 预估工作量（低/中/高）`,
                 outputFormat: 'json_schema',
+                promptSource: 'user',
                 agentName: 'architect',
                 model: 'opus',
             },
@@ -138,6 +154,7 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
         description: '代码实现阶段',
 
         primaryActions: [
+            DIRECT_EXECUTE_ACTION,
             {
                 id: 'auto-develop',
                 name: '自动化开发',
@@ -170,6 +187,7 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
 2. lint / type-check 的执行结果
 3. 后续建议（如有）`,
                 outputFormat: 'json_schema',
+                promptSource: 'plan-doc',
                 agentName: 'developer',
                 model: 'sonnet',
                 requiresWorktree: true,
@@ -214,6 +232,7 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
 - 问题描述
 - 修复建议`,
                 outputFormat: 'json_schema',
+                promptSource: 'plan-doc',
                 agentName: 'developer',
                 model: 'sonnet',
                 requiresWorktree: true,
@@ -237,6 +256,7 @@ export const DEFAULT_LANE_CONFIGS: Record<string, LaneConfig> = {
         description: '自动化测试阶段',
 
         primaryActions: [
+            DIRECT_EXECUTE_ACTION,
             {
                 id: 'auto-test',
                 name: '自动化测试',
@@ -276,6 +296,7 @@ pnpm lint          # 代码规范
 4. 代码覆盖率（如可获取）
 5. 修复建议（如有未修复的问题）`,
                 outputFormat: 'json_schema',
+                promptSource: 'plan-doc',
                 agentName: 'tester',
                 model: 'sonnet',
                 requiresWorktree: true,
@@ -320,6 +341,7 @@ pnpm type-check
 2. 未通过项的详细说明
 3. 总体评估：是否可以合并（推荐合并 / 需要修复 / 不建议合并）`,
                 outputFormat: 'json_schema',
+                promptSource: 'plan-doc',
                 agentName: 'tester',
                 model: 'sonnet',
                 requiresWorktree: true,
@@ -343,11 +365,13 @@ pnpm type-check
         description: '合并前准备',
 
         primaryActions: [
+            DIRECT_EXECUTE_ACTION,
             {
                 id: 'merge-to-main',
                 name: '合并到主分支',
                 buttonLabel: '合并到主分支',
                 buttonIcon: 'git-merge',
+                promptSource: 'lane-only',
                 requiresWorktree: true,
                 systemPrompt: `你是一位资深的发布工程师。你的任务是将当前工作分支安全地合并到主分支。
 

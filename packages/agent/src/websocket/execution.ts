@@ -283,8 +283,10 @@ async function handleLaneAction(
     const baseSystemPrompt = actionConfig?.systemPrompt || laneConfig.systemPrompt || lanePrompt;
 
     let prompt: string;
-    // ... existing switch (laneConfig.promptSource) ...
-    switch (laneConfig.promptSource) {
+    // 按钮级 promptSource 优先于泳道级
+    const effectivePromptSource = actionConfig?.promptSource ?? laneConfig.promptSource;
+    const effectiveCustomTemplate = actionConfig?.customPromptTemplate ?? laneConfig.customPromptTemplate;
+    switch (effectivePromptSource) {
         case 'user':
             prompt = `${baseSystemPrompt} \n\n-- -\n\n${userContent} `;
             break;
@@ -302,7 +304,7 @@ async function handleLaneAction(
             break;
         case 'lane-only': prompt = baseSystemPrompt; break;
         case 'custom':
-            prompt = (laneConfig.customPromptTemplate || '{lanePrompt}\n\n{userPrompt}')
+            prompt = (effectiveCustomTemplate || '{lanePrompt}\n\n{userPrompt}')
                 .replace('{lanePrompt}', baseSystemPrompt)
                 .replace('{userPrompt}', task.prompt || '')
                 .replace('{planPath}', task.planPath || '');
@@ -873,13 +875,17 @@ async function handleExecute(connection: SocketStream, message: ExecuteMessage) 
     const workingDir = task.worktree?.path || project.path;
     const laneConfig = await getMergedLaneConfig(task.laneId, project.path, getLaneConfig(task.laneId)!);
     const lanePrompt = getLanePrompt(task.laneId, data, config.settings.lanePrompts || {});
+    const primaryAction = laneConfig.primaryActions[0];
+    // 按钮级 promptSource 优先于泳道级
+    const effectivePromptSource = primaryAction?.promptSource ?? laneConfig.promptSource;
+    const effectiveCustomTemplate = primaryAction?.customPromptTemplate ?? laneConfig.customPromptTemplate;
     let prompt: string;
 
-    switch (laneConfig.promptSource) {
+    switch (effectivePromptSource) {
         case 'user': prompt = lanePrompt ? `${lanePrompt} \n\n-- -\n\n${task.prompt || task.title} ` : (task.prompt || task.title); break;
         case 'plan-doc': prompt = task.planPath ? `${lanePrompt} \n\n请按照 @${task.planPath} 继续执行任务。` : (lanePrompt || '请继续执行任务。'); break;
         case 'lane-only': prompt = lanePrompt || '请继续。'; break;
-        case 'custom': prompt = (laneConfig.customPromptTemplate || '{lanePrompt}\n\n{userPrompt}').replace('{lanePrompt}', lanePrompt).replace('{userPrompt}', task.prompt || '').replace('{planPath}', task.planPath || ''); break;
+        case 'custom': prompt = (effectiveCustomTemplate || '{lanePrompt}\n\n{userPrompt}').replace('{lanePrompt}', lanePrompt).replace('{userPrompt}', task.prompt || '').replace('{planPath}', task.planPath || ''); break;
         default: prompt = task.prompt || task.title;
     }
 
@@ -887,7 +893,6 @@ async function handleExecute(connection: SocketStream, message: ExecuteMessage) 
     task.updatedAt = new Date().toISOString();
     await writeProjectData(project.path, data);
 
-    const primaryAction = laneConfig.primaryActions[0];
     const outputFormat = primaryAction?.outputSchema ? { type: (primaryAction.outputFormat || 'json_schema') as any, schema: primaryAction.outputSchema } : getSchemaForLane(task.laneId);
     await agentManager.startTaskExecution(
         task.id,

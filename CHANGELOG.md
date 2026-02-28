@@ -7,6 +7,9 @@ This document records the major milestones and technical updates of the VibeWard
 ## [2026-02-28] - Lane Configuration Enhancement & Prompt Optimization
 
 ### ⚙️ Lane System & Workflow Improvements
+- **PromptSource 细粒度控制**:
+    - 在 `LaneActionConfig` 中引入 `promptSource` 和 `customPromptTemplate` 字段，支持在 Action 级别覆盖泳道级的提示词配置。
+    - 改进了 `execution.ts` 中的 Prompt 合成逻辑，使其能够根据 Action 级别的配置动态切换提示词来源（如仅使用泳道提示词、使用任务标题作为提示词或使用自定义模板）。
 - **Comprehensive Lane Config Refactor**:
     - Significantly updated the default system prompts for all workflow stages (Plan, Develop, Test, Merge) to provide clearer instructions and more structured execution flows.
     - Added **Code Review** functionality: Introduced a dedicated "Code Review" action in the `Review` lane with a specialized system prompt for rigorous code analysis (correctness, quality, security, performance).
