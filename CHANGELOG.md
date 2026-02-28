@@ -4,7 +4,20 @@ This document records the major milestones and technical updates of the VibeWard
 
 ---
 
-## [2026-02-24] - Conversation Control & Button Consolidation
+## [2026-02-28] - Lane Configuration Enhancement & Prompt Optimization
+
+### ⚙️ Lane System & Workflow Improvements
+- **Comprehensive Lane Config Refactor**:
+    - Significantly updated the default system prompts for all workflow stages (Plan, Develop, Test, Merge) to provide clearer instructions and more structured execution flows.
+    - Added **Code Review** functionality: Introduced a dedicated "Code Review" action in the `Review` lane with a specialized system prompt for rigorous code analysis (correctness, quality, security, performance).
+    - Enhanced **Testing Workflow**: Split testing into "Automated Testing" and "Acceptance Check" actions, each with detailed execution steps including compilation checks, linting, and regression testing.
+    - Robust **Merge Protocol**: Refined the merge lane with a comprehensive pre-merge checklist and step-by-step git operations to ensure main branch stability.
+- **Action Decomposition Integration**: Integrated `TASK_DECOMPOSE_ACTION` across multiple lanes, enabling autonomous task breakdown and better planning granularity within the Agent workflow.
+- **Model Standardization**: Standardized the use of `sonnet` model and `json_schema` output formats across all primary actions for consistent high-quality execution.
+
+---
+
+
 
 ### 🎨 UI/UX Improvements
 - **Send & Stop Button Consolidation**:
